@@ -162,6 +162,19 @@ def process_sermon_worker(job_id, audio_path, filename, custom_title, custom_scr
         }
     })
     print(f'[{job_id}] Completed successfully!')
+    except Exception as e:
+        import traceback
+        err_detail = traceback.format_exc()
+        print(f'[{job_id}] FATAL WORKER ERROR:\n{err_detail}')
+        JOBS[job_id].update({
+            'status': 'error',
+            'error': str(e),
+            'message': f'Error: {str(e)}'
+        })
+
+@app.route('/api/jobs')
+def list_jobs():
+    return jsonify(JOBS), 200
 
 @app.route('/api/publish', methods=['POST'])
 def start_publish_job():
