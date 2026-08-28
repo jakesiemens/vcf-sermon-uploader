@@ -1,0 +1,8 @@
+__pycache__
+*.pyc
+uploads/*
+output/*
+.git
+active_mobile_link.txt
+*.vbs
+*.bat
