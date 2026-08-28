@@ -100,23 +100,27 @@ def render_sermon_backdrop(title, preacher, date_str, out_image_path):
     return out_image_path
 
 def build_video_from_audio(audio_path, image_path, output_mp4_path, progress_callback=None):
-    """Muxes static graphic image and raw audio file into 1080p MP4 video"""
+    """Muxes static graphic image and raw audio file into 1080p MP4 video at lightning speed (1 fps)"""
     cmd = [
         FFMPEG_BIN, "-y",
+        "-framerate", "1",
         "-loop", "1",
         "-i", image_path,
         "-i", audio_path,
         "-c:v", "libx264",
         "-tune", "stillimage",
         "-preset", "ultrafast",
-        "-threads", "0",
-        "-c:a", "aac",
-        "-b:a", "192k",
+        "-r", "1",
+        "-g", "1",
         "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "128k",
         "-shortest",
         output_mp4_path
     ]
-    
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    proc.communicate()
+    print(f"Running FFmpeg: {' '.join(cmd)}")
+    res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    if res.returncode != 0:
+        print(f"FFmpeg error ({res.returncode}): {res.stderr[-500:]}")
+        return False
     return os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000
