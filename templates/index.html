@@ -630,28 +630,13 @@
             if (xhr.status === 200) {
                 try {
                     var data = JSON.parse(xhr.responseText);
-                    if (data.success) {
+                    if (data.success && data.job_id) {
                         setStep('step-upload', 'done');
-                        setStep('step-ai', 'done');
-                        setStep('step-video', 'done');
-                        setStep('step-youtube', 'done');
-                        setStep('step-website', 'done');
-                        progressBarFill.style.width = '100%';
-
-                        if (data.quota_notice) {
-                            document.getElementById('progress-title').textContent = '✅ Video Rendered Successfully!';
-                            document.getElementById('success-summary').textContent = data.message;
-                            document.getElementById('yt-link').style.display = 'none';
-                        } else {
-                            document.getElementById('progress-title').textContent = '🎉 Publishing Complete!';
-                            document.getElementById('success-summary').textContent = '"' + data.title + '" by ' + data.preacher + ' is now live on YouTube and victorychristianfellowship.ca!';
-                            document.getElementById('yt-link').href = data.youtube_url;
-                            document.getElementById('yt-link').style.display = 'inline-flex';
-                        }
-                        successBox.classList.add('active');
-                        successBox.scrollIntoView({ behavior: 'smooth' });
+                        setStep('step-ai', 'active');
+                        pollJobStatus(data.job_id);
+                        return;
                     } else {
-                        showError(data.error || 'Unknown server error');
+                        showError(data.error || 'Upload error');
                     }
                 } catch (err) {
                     showError('Error parsing response: ' + err.message);
@@ -669,12 +654,83 @@
         };
 
         xhr.onerror = function() {
-            showError('Network connection error. Please make sure the portal server is running.');
+            showError('Network connection error. Please try again.');
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<span>🚀 Process &amp; Publish Sermon</span>';
         };
 
         xhr.send(formData);
+    }
+
+    function pollJobStatus(jobId) {
+        var pollTimer = setInterval(function() {
+            var req = new XMLHttpRequest();
+            req.open('GET', '/api/status/' + jobId, true);
+            req.onload = function() {
+                if (req.status === 200) {
+                    try {
+                        var job = JSON.parse(req.responseText);
+                        if (job.message) {
+                            document.getElementById('progress-title').textContent = job.message;
+                        }
+                        if (job.progress) {
+                            progressBarFill.style.width = job.progress + '%';
+                        }
+                        if (job.step >= 2) {
+                            setStep('step-upload', 'done');
+                            setStep('step-ai', job.step === 2 ? 'active' : 'done');
+                        }
+                        if (job.step >= 3) {
+                            setStep('step-ai', 'done');
+                            setStep('step-video', job.step === 3 ? 'active' : 'done');
+                        }
+                        if (job.step >= 4) {
+                            setStep('step-video', 'done');
+                            setStep('step-youtube', job.step === 4 ? 'active' : 'done');
+                        }
+                        if (job.step >= 5) {
+                            setStep('step-youtube', 'done');
+                            setStep('step-website', job.step === 5 ? 'active' : 'done');
+                        }
+
+                        if (job.status === 'completed') {
+                            clearInterval(pollTimer);
+                            setStep('step-upload', 'done');
+                            setStep('step-ai', 'done');
+                            setStep('step-video', 'done');
+                            setStep('step-youtube', 'done');
+                            setStep('step-website', 'done');
+                            progressBarFill.style.width = '100%';
+
+                            var res = job.result || {};
+                            if (res.quota_notice) {
+                                document.getElementById('progress-title').textContent = '✅ Video Rendered Successfully!';
+                                document.getElementById('success-summary').textContent = res.quota_message;
+                                document.getElementById('yt-link').style.display = 'none';
+                            } else {
+                                document.getElementById('progress-title').textContent = '🎉 Publishing Complete!';
+                                document.getElementById('success-summary').textContent = '"' + res.title + '" by ' + res.preacher + ' is now live on YouTube and victorychristianfellowship.ca!';
+                                document.getElementById('yt-link').href = res.youtube_url;
+                                document.getElementById('yt-link').style.display = 'inline-flex';
+                            }
+                            successBox.classList.add('active');
+                            successBox.scrollIntoView({ behavior: 'smooth' });
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = '<span>🚀 Process &amp; Publish Sermon</span>';
+                        } else if (job.status === 'error') {
+                            clearInterval(pollTimer);
+                            showError(job.error || 'An error occurred during processing.');
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = '<span>🚀 Process &amp; Publish Sermon</span>';
+                        }
+                    } catch(e) {}
+                }
+            };
+            req.onerror = function() {
+                // Transient connection hiccup, keep polling
+            };
+            req.send();
+        }, 1500);
     }
 
     function showError(msg) {
