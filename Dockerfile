@@ -9,21 +9,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Set up non-root user with UID 1000 (Hugging Face Spaces standard)
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH \
+    PORT=7860
+
+WORKDIR $HOME/app
 
 # Install Python requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --chown=user requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Copy application files
-COPY . .
+COPY --chown=user . .
 
 # Ensure upload/output directories exist
 RUN mkdir -p uploads output
 
-# Expose port (default 5000 or cloud )
-ENV PORT=5000
-EXPOSE 5000
+EXPOSE 7860
 
-# Start server via python app.py
 CMD ["python", "app.py"]
