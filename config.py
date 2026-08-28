@@ -76,4 +76,4 @@ PREACHERS = [
     "Guest Speaker"
 ]
 
-DEFAULT_PORT = int(os.environ.get("PORT", 5000))
+DEFAULT_PORT = int(os.environ.get("PORT", 7860))
