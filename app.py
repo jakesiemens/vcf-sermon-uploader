@@ -137,7 +137,9 @@ def publish_sermon():
 
 if __name__ == '__main__':
     from waitress import serve
+    port = int(os.environ.get("PORT", 7860))
     print(f"=" * 65)
     print(f"  VCF SERMON PUBLISHING PORTAL")
-    print(f"  Starting server on http://localhost:{DEFAULT_PORT}")
-    serve(app, host='0.0.0.0', port=DEFAULT_PORT, threads=6)
+    print(f"  Starting cloud server on 0.0.0.0:{port}")
+    print(f"=" * 65)
+    serve(app, host='0.0.0.0', port=port, threads=6)
