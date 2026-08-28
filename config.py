@@ -3,6 +3,15 @@ import glob
 import shutil
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Unpack environment secrets if provided in cloud
+if os.environ.get("YOUTUBE_TOKEN_JSON"):
+    with open(os.path.join(BASE_DIR, "token.json"), "w", encoding="utf-8") as f:
+        f.write(os.environ["YOUTUBE_TOKEN_JSON"])
+
+if os.environ.get("YOUTUBE_CLIENT_SECRET_JSON"):
+    with open(os.path.join(BASE_DIR, "client_secret.json"), "w", encoding="utf-8") as f:
+        f.write(os.environ["YOUTUBE_CLIENT_SECRET_JSON"])
 WEBSITE_DIR = os.environ.get("WEBSITE_DIR", r"d:\Personal\VCF Website")
 
 # Token resolution (container local or website dir)
