@@ -43,95 +43,58 @@ def get_font(size, bold=False):
 
     return ImageFont.load_default()
 
-BACKGROUND_PATH = os.path.join(STATIC_DIR, "background.jpg")
-
 def render_sermon_backdrop(title, preacher, date_str, out_image_path):
-    """Generates stunning 1920x1080 graphic card with sunset backdrop and high-contrast typography"""
+    """Generates 1920x1080 graphic card for video and YouTube thumbnail"""
     w, h = 1920, 1080
-    
-    if os.path.exists(BACKGROUND_PATH):
-        try:
-            base_bg = Image.open(BACKGROUND_PATH).convert("RGBA")
-            if base_bg.size != (w, h):
-                base_bg = base_bg.resize((w, h), Image.Resampling.LANCZOS)
-            
-            # Smooth dark vignette overlay so white and gold text pops
-            overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-            draw_over = ImageDraw.Draw(overlay)
-            for y in range(h):
-                if 230 <= y <= 980:
-                    dist = abs(y - 590) / 380.0
-                    alpha = int(140 * (1.0 - (dist ** 2) * 0.45))
-                    draw_over.line([(0, y), (w, y)], fill=(10, 18, 30, max(0, min(165, alpha))))
-                elif y > 980:
-                    alpha = int(140 * (1.0 - (y - 980) / 100.0))
-                    if alpha > 0:
-                        draw_over.line([(0, y), (w, y)], fill=(10, 18, 30, alpha))
-                elif y < 230:
-                    alpha = int(85 * (1.0 - y / 230.0))
-                    draw_over.line([(0, y), (w, y)], fill=(10, 18, 30, alpha))
-            
-            img = Image.alpha_composite(base_bg, overlay).convert("RGB")
-        except Exception as e:
-            print(f"Background load notice: {e}")
-            img = Image.new("RGB", (w, h), BG_COLOR)
-    else:
-        img = Image.new("RGB", (w, h), BG_COLOR)
-
+    img = Image.new("RGB", (w, h), BG_COLOR)
     draw = ImageDraw.Draw(img)
+
+    # Accent top and bottom borders
+    draw.rectangle([(0, 0), (w, 8)], fill=ORANGE_BAR)
+    draw.rectangle([(0, h - 8), (w, h)], fill=ORANGE_BAR)
 
     # Logo
     if os.path.exists(LOGO_PATH):
         try:
             logo = Image.open(LOGO_PATH).convert("RGBA")
-            logo.thumbnail((500, 145), Image.Resampling.LANCZOS)
-            lw, lh = logo.size
-            img.paste(logo, ((w - lw) // 2, 115), mask=logo)
+            logo_w = 420
+            logo_h = int(logo.size[1] * (logo_w / logo.size[0]))
+            logo = logo.resize((logo_w, logo_h), Image.Resampling.LANCZOS)
+            img.paste(logo, ((w - logo_w) // 2, 140), mask=logo)
         except Exception as e:
-            print(f"Logo notice: {e}")
+            print(f"Logo error: {e}")
 
-    # Orange accent line
-    line_w = 380
-    line_y = 295
+    # Orange divider line
+    line_y = 350
+    line_w = 260
     draw.rectangle([((w - line_w) // 2, line_y), ((w + line_w) // 2, line_y + 4)], fill=ORANGE_BAR)
 
     # Title
-    font_size = 64 if len(title) > 30 else 72
+    font_size = 56 if len(title) > 40 else 66
     title_font = get_font(font_size, bold=True)
-    wrap_width = 30 if font_size == 72 else 36
+    wrap_width = 30 if font_size == 66 else 38
     title_lines = textwrap.wrap(title.upper(), width=wrap_width)
 
-    total_title_h = len(title_lines) * (font_size + 18)
-    title_start_y = 450 + (120 - total_title_h) // 2
+    total_title_h = len(title_lines) * (font_size + 16)
+    title_start_y = 440 + (120 - total_title_h) // 2
     curr_y = title_start_y
 
     for line in title_lines:
         bbox = draw.textbbox((0, 0), line, font=title_font)
         text_w = bbox[2] - bbox[0]
-        tx = (w - text_w) // 2
-        # Soft shadow for maximum contrast
-        draw.text((tx + 3, curr_y + 3), line, fill=(0, 0, 0), font=title_font)
-        draw.text((tx, curr_y), line, fill=TITLE_COLOR, font=title_font)
-        curr_y += font_size + 18
+        draw.text(((w - text_w) // 2, curr_y), line, fill=TITLE_COLOR, font=title_font)
+        curr_y += font_size + 16
 
     # Preacher
-    preacher_font = get_font(44, bold=True)
+    preacher_font = get_font(42, bold=True)
     preacher_text = f"Preacher: {preacher}" if preacher else "Victory Christian Fellowship"
     p_bbox = draw.textbbox((0, 0), preacher_text, font=preacher_font)
-    pw = p_bbox[2] - p_bbox[0]
-    px = (w - pw) // 2
-    py = 760
-    draw.text((px + 2, py + 2), preacher_text, fill=(0, 0, 0), font=preacher_font)
-    draw.text((px, py), preacher_text, fill=PREACHER_COLOR, font=preacher_font)
+    draw.text(((w - (p_bbox[2] - p_bbox[0])) // 2, 770), preacher_text, fill=PREACHER_COLOR, font=preacher_font)
 
     # Date
-    date_font = get_font(36, bold=False)
+    date_font = get_font(34, bold=False)
     d_bbox = draw.textbbox((0, 0), date_str, font=date_font)
-    dw = d_bbox[2] - d_bbox[0]
-    dx = (w - dw) // 2
-    dy = 840
-    draw.text((dx + 2, dy + 2), date_str, fill=(0, 0, 0), font=date_font)
-    draw.text((dx, dy), date_str, fill=(226, 232, 240), font=date_font)
+    draw.text(((w - (d_bbox[2] - d_bbox[0])) // 2, 850), date_str, fill=DATE_COLOR, font=date_font)
 
     img.save(out_image_path, "JPEG", quality=95)
     return out_image_path
