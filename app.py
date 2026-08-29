@@ -2,6 +2,7 @@ import os
 import uuid
 import threading
 import time
+import traceback
 from datetime import datetime
 from flask import Flask, request, render_template, jsonify
 from werkzeug.utils import secure_filename
@@ -33,148 +34,149 @@ def index():
 def health():
     return jsonify({'status': 'healthy', 'time': datetime.now().isoformat()}), 200
 
+@app.route('/api/jobs')
+def list_jobs():
+    return jsonify(JOBS), 200
+
 def process_sermon_worker(job_id, audio_path, filename, custom_title, custom_scripture, preacher, preached_date_iso, privacy):
     try:
-        dt = datetime.strptime(preached_date_iso, '%Y-%m-%d') if preached_date_iso else datetime.now()
-        display_date = dt.strftime('%B %d, %Y')
-    except:
-        dt = datetime.now()
-        display_date = dt.strftime('%B %d, %Y')
-
-    # Step 2: AI Analysis
-    JOBS[job_id].update({
-        'step': 2,
-        'step_name': 'ai',
-        'progress': 30,
-        'message': 'AI analyzing sermon audio, title, and scripture...'
-    })
-
-    title = custom_title
-    scripture = custom_scripture
-
-    if not title or not scripture:
-        print(f'[{job_id}] Extracting snippet for AI analysis...')
-        snippet_wav = extract_audio_snippet(audio_path, duration_seconds=75)
-        transcript = ''
-        if snippet_wav and os.path.exists(snippet_wav):
-            transcript = transcribe_audio_snippet(snippet_wav)
-            print(f'[{job_id}] Transcript: {transcript[:100]}...')
-        
-        if not scripture:
-            scripture = detect_scripture(transcript)
-        if not title:
-            title = generate_smart_title(transcript, scripture, preacher)
-
-    if not title:
-        title = 'Sunday Morning Message'
-
-    print(f'[{job_id}] Final Title: {title} | Scripture: {scripture} | Preacher: {preacher}')
-
-    # Step 3: Video Generation
-    JOBS[job_id].update({
-        'step': 3,
-        'step_name': 'video',
-        'progress': 55,
-        'message': f'Rendering 1080p graphic backdrop for "{title}"...'
-    })
-
-    base_name = os.path.splitext(os.path.basename(audio_path))[0]
-    backdrop_path = os.path.join(OUTPUT_DIR, f'{base_name}_backdrop.jpg')
-    video_path = os.path.join(OUTPUT_DIR, f'{base_name}_1080p.mp4')
-
-    render_sermon_backdrop(title, preacher, display_date, backdrop_path)
-    
-    JOBS[job_id]['message'] = 'Encoding 1080p video with FFmpeg...'
-    success_video = build_video_from_audio(audio_path, backdrop_path, video_path)
-    if not success_video:
-        raise RuntimeError('FFmpeg failed to render 1080p video file.')
-
-    # Step 4: YouTube Upload
-    JOBS[job_id].update({
-        'step': 4,
-        'step_name': 'youtube',
-        'progress': 80,
-        'message': 'Uploading 1080p video & thumbnail to YouTube channel...'
-    })
-
-    video_id = None
-    youtube_url = None
-    quota_notice = False
-    quota_message = ''
-
-    try:
-        yt_res = upload_sermon_to_youtube(
-            video_path=video_path,
-            thumbnail_path=backdrop_path,
-            title=title,
-            preacher=preacher,
-            display_date=display_date,
-            scripture=scripture,
-            privacy_status=privacy
-        )
-        video_id = yt_res['video_id']
-        youtube_url = yt_res['url']
-    except Exception as e:
-        err_msg = str(e)
-        if 'quotaExceeded' in err_msg or 'quota' in err_msg.lower():
-            quota_notice = True
-            quota_message = 'Video rendered successfully! YouTube daily upload quota will reset at 4:00 AM ADT, at which point the video will complete uploading automatically.'
-            print(f'[{job_id}] YouTube quota reached. Video saved in output.')
-        else:
-            raise RuntimeError(f'YouTube API upload failed: {err_msg}')
-
-    # Step 5: Website Sync
-    JOBS[job_id].update({
-        'step': 5,
-        'step_name': 'website',
-        'progress': 95,
-        'message': 'Syncing sermon to victorychristianfellowship.ca...'
-    })
-
-    if video_id:
         try:
-            sync_new_sermon_to_website(
-                video_id=video_id,
+            dt = datetime.strptime(preached_date_iso, '%Y-%m-%d') if preached_date_iso else datetime.now()
+            display_date = dt.strftime('%B %d, %Y')
+        except Exception:
+            dt = datetime.now()
+            display_date = dt.strftime('%B %d, %Y')
+
+        # Step 2: AI Analysis
+        JOBS[job_id].update({
+            'step': 2,
+            'step_name': 'ai',
+            'progress': 30,
+            'message': 'AI analyzing sermon audio, title, and scripture...'
+        })
+
+        title = custom_title
+        scripture = custom_scripture
+
+        if not title or not scripture:
+            print(f'[{job_id}] Extracting snippet for AI analysis...')
+            snippet_wav = extract_audio_snippet(audio_path, duration_seconds=75)
+            transcript = ''
+            if snippet_wav and os.path.exists(snippet_wav):
+                transcript = transcribe_audio_snippet(snippet_wav)
+                print(f'[{job_id}] Transcript: {transcript[:100]}...')
+            
+            if not scripture:
+                scripture = detect_scripture(transcript)
+            if not title:
+                title = generate_smart_title(transcript, scripture, preacher)
+
+        if not title:
+            title = 'Sunday Morning Message'
+
+        print(f'[{job_id}] Final Title: {title} | Scripture: {scripture} | Preacher: {preacher}')
+
+        # Step 3: Video Generation (Fast 1fps)
+        JOBS[job_id].update({
+            'step': 3,
+            'step_name': 'video',
+            'progress': 55,
+            'message': f'Rendering 1080p backdrop for "{title}"...'
+        })
+
+        base_name = os.path.splitext(os.path.basename(audio_path))[0]
+        backdrop_path = os.path.join(OUTPUT_DIR, f'{base_name}_backdrop.jpg')
+        video_path = os.path.join(OUTPUT_DIR, f'{base_name}_1080p.mp4')
+
+        render_sermon_backdrop(title, preacher, display_date, backdrop_path)
+        
+        JOBS[job_id]['message'] = 'Encoding 1080p video with FFmpeg...'
+        success_video = build_video_from_audio(audio_path, backdrop_path, video_path)
+        if not success_video:
+            raise RuntimeError('FFmpeg failed to render 1080p video file.')
+
+        # Step 4: YouTube Upload
+        JOBS[job_id].update({
+            'step': 4,
+            'step_name': 'youtube',
+            'progress': 80,
+            'message': 'Uploading 1080p video & thumbnail to YouTube channel...'
+        })
+
+        video_id = None
+        youtube_url = None
+        quota_notice = False
+        quota_message = ''
+
+        try:
+            yt_res = upload_sermon_to_youtube(
+                video_path=video_path,
+                thumbnail_path=backdrop_path,
                 title=title,
                 preacher=preacher,
-                preached_date_iso=preached_date_iso,
                 display_date=display_date,
-                scripture=scripture
+                scripture=scripture,
+                privacy_status=privacy
             )
+            video_id = yt_res['video_id']
+            youtube_url = yt_res['url']
         except Exception as e:
-            print(f'[{job_id}] Website sync notice: {e}')
+            err_msg = str(e)
+            if 'quotaExceeded' in err_msg or 'quota' in err_msg.lower():
+                quota_notice = True
+                quota_message = 'Video rendered successfully! YouTube daily upload quota will reset at 4:00 AM ADT, at which point the video will complete uploading automatically.'
+                print(f'[{job_id}] YouTube quota reached. Video saved in output.')
+            else:
+                raise RuntimeError(f'YouTube API upload failed: {err_msg}')
 
-    # Completed
-    JOBS[job_id].update({
-        'status': 'completed',
-        'step': 5,
-        'progress': 100,
-        'message': 'Sermon published successfully!',
-        'result': {
-            'title': title,
-            'preacher': preacher,
-            'scripture': scripture,
-            'display_date': display_date,
-            'video_id': video_id,
-            'youtube_url': youtube_url or f'https://youtu.be/{video_id}' if video_id else '',
-            'quota_notice': quota_notice,
-            'quota_message': quota_message
-        }
-    })
-    print(f'[{job_id}] Completed successfully!')
+        # Step 5: Website Sync
+        JOBS[job_id].update({
+            'step': 5,
+            'step_name': 'website',
+            'progress': 95,
+            'message': 'Syncing sermon to victorychristianfellowship.ca...'
+        })
+
+        if video_id:
+            try:
+                sync_new_sermon_to_website(
+                    video_id=video_id,
+                    title=title,
+                    preacher=preacher,
+                    preached_date_iso=preached_date_iso,
+                    display_date=display_date,
+                    scripture=scripture
+                )
+            except Exception as e:
+                print(f'[{job_id}] Website sync notice: {e}')
+
+        # Completed
+        JOBS[job_id].update({
+            'status': 'completed',
+            'step': 5,
+            'progress': 100,
+            'message': 'Sermon published successfully!',
+            'result': {
+                'title': title,
+                'preacher': preacher,
+                'scripture': scripture,
+                'display_date': display_date,
+                'video_id': video_id,
+                'youtube_url': youtube_url or (f'https://youtu.be/{video_id}' if video_id else ''),
+                'quota_notice': quota_notice,
+                'quota_message': quota_message
+            }
+        })
+        print(f'[{job_id}] Completed successfully!')
+
     except Exception as e:
-        import traceback
         err_detail = traceback.format_exc()
-        print(f'[{job_id}] FATAL WORKER ERROR:\n{err_detail}')
+        print(f'[{job_id}] FATAL WORKER ERROR: ' + err_detail)
         JOBS[job_id].update({
             'status': 'error',
             'error': str(e),
             'message': f'Error: {str(e)}'
         })
-
-@app.route('/api/jobs')
-def list_jobs():
-    return jsonify(JOBS), 200
 
 @app.route('/api/publish', methods=['POST'])
 def start_publish_job():
@@ -217,7 +219,6 @@ def start_publish_job():
     )
     worker_thread.start()
 
-    # Immediately respond with 200 OK and job_id! Zero 502 timeouts!
     return jsonify({
         'success': True,
         'job_id': job_id,
