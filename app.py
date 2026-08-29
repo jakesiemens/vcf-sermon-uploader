@@ -38,6 +38,21 @@ def health():
 def list_jobs():
     return jsonify(JOBS), 200
 
+@app.route('/api/debug')
+def debug_info():
+    ffmpeg_log = ""
+    log_p = os.path.join(OUTPUT_DIR, "ffmpeg.log")
+    if os.path.exists(log_p):
+        try:
+            with open(log_p, "r") as f:
+                ffmpeg_log = f.read()[-1000:]
+        except:
+            pass
+    return jsonify({
+        "jobs": JOBS,
+        "ffmpeg_log": ffmpeg_log
+    }), 200
+
 def process_sermon_worker(job_id, audio_path, filename, custom_title, custom_scripture, preacher, preached_date_iso, privacy):
     try:
         try:
