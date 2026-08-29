@@ -50,21 +50,16 @@ def upload_sermon_to_youtube(video_path, thumbnail_path, title, preacher, displa
 
     # Description
     desc_lines = [
-        "Victory Christian Fellowship",
-        "Williamsburg, New Brunswick",
-        "",
-        f"Sermon: {title}",
-        f"Preacher: {preacher}",
-        f"Date Preached: {display_date}",
+        f"{title} | {preacher}",
     ]
     if scripture:
         desc_lines.append(f"Scripture: {scripture}")
     desc_lines.extend([
+        "Victory Christian Fellowship • Williamsburg, New Brunswick",
+        f"Date Preached: {display_date}",
         "",
-        "Visit our website for more sermons, service times, and directions:",
-        "https://victorychristianfellowship.ca",
-        "",
-        "1534 NB-107, Williamsburg, NB  E6B 1W9"
+        "Visit our website for more sermons, service times, and resources:",
+        "https://victorychristianfellowship.ca/sermons.html"
     ])
     yt_description = "\n".join(desc_lines)
 
