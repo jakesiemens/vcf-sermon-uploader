@@ -165,8 +165,17 @@ def build_video_from_audio(audio_path, image_path, output_mp4_path, progress_cal
     cmd.append(output_mp4_path)
 
     print(f"Running FFmpeg: {' '.join(cmd)}")
-    res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    log_path = os.path.join(os.path.dirname(output_mp4_path), "ffmpeg.log")
+    with open(log_path, "w") as log_f:
+        res = subprocess.run(cmd, stdout=log_f, stderr=subprocess.STDOUT)
+
     if res.returncode != 0:
-        print(f"FFmpeg error ({res.returncode}): {res.stderr[-500:]}")
+        err_tail = ""
+        try:
+            with open(log_path, "r") as log_f:
+                err_tail = log_f.read()[-500:]
+        except:
+            pass
+        print(f"FFmpeg error ({res.returncode}): {err_tail}")
         return False
     return os.path.exists(output_mp4_path) and os.path.getsize(output_mp4_path) > 1000
