@@ -7,13 +7,32 @@ from googleapiclient.http import MediaFileUpload
 from config import TOKEN_PATH, CLIENT_SECRET_PATH
 
 def get_youtube_service():
-    """Initializes authenticated YouTube API client"""
-    if not os.path.exists(TOKEN_PATH):
-        raise FileNotFoundError(f"YouTube credentials token not found at: {TOKEN_PATH}")
-    
-    with open(TOKEN_PATH, "r", encoding="utf-8") as f:
-        info = json.load(f)
-    
+    """Initializes authenticated YouTube API client from env var or file"""
+    info = None
+
+    # 1. Try direct environment variable
+    env_token = os.environ.get("YOUTUBE_TOKEN_JSON", "").strip()
+    if env_token:
+        try:
+            if (env_token.startswith("'") and env_token.endswith("'")) or (env_token.startswith('"') and env_token.endswith('"')):
+                env_token = env_token[1:-1].strip()
+            info = json.loads(env_token)
+        except Exception as e:
+            print(f"Warning: Could not parse YOUTUBE_TOKEN_JSON env var: {e}")
+
+    # 2. Try token file
+    if not info and os.path.exists(TOKEN_PATH):
+        try:
+            with open(TOKEN_PATH, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if content:
+                    info = json.loads(content)
+        except Exception as e:
+            print(f"Warning: Could not parse {TOKEN_PATH}: {e}")
+
+    if not info:
+        raise RuntimeError("YouTube authentication token not configured. Please add YOUTUBE_TOKEN_JSON under Environment in Render.")
+
     creds = Credentials.from_authorized_user_info(info)
     return build("youtube", "v3", credentials=creds)
 
