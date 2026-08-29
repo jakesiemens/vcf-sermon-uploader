@@ -99,25 +99,71 @@ def render_sermon_backdrop(title, preacher, date_str, out_image_path):
     img.save(out_image_path, "JPEG", quality=95)
     return out_image_path
 
+def get_audio_duration_seconds(audio_path):
+    """Accurately extracts audio length in seconds using ffprobe or mutagen"""
+    try:
+        cmd = [
+            "ffprobe", "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            audio_path
+        ]
+        out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True).strip()
+        val = float(out)
+        if val > 0:
+            return int(val) + 1
+    except:
+        pass
+
+    try:
+        from mutagen import File as MutagenFile
+        audio = MutagenFile(audio_path)
+        if audio and audio.info and audio.info.length:
+            return int(audio.info.length) + 1
+    except:
+        pass
+
+    return None
+
 def build_video_from_audio(audio_path, image_path, output_mp4_path, progress_callback=None):
-    """Muxes static graphic image and raw audio file into 1080p MP4 video at lightning speed (1 fps)"""
+    """Muxes static graphic image and raw audio file into 1080p MP4 video at lightning speed (under 10s!)"""
+    dur = get_audio_duration_seconds(audio_path)
+    print(f"Detected audio duration: {dur}s")
+
+    ext = os.path.splitext(audio_path)[1].lower()
+    can_copy_audio = ext in ['.mp3', '.m4a', '.aac']
+
     cmd = [
         FFMPEG_BIN, "-y",
-        "-framerate", "1",
         "-loop", "1",
+        "-framerate", "1",
         "-i", image_path,
         "-i", audio_path,
+    ]
+
+    if dur:
+        cmd.extend(["-t", str(dur)])
+
+    cmd.extend([
         "-c:v", "libx264",
         "-tune", "stillimage",
         "-preset", "ultrafast",
+        "-crf", "32",
         "-r", "1",
         "-g", "1",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-shortest",
-        output_mp4_path
-    ]
+        "-pix_fmt", "yuv420p"
+    ])
+
+    if can_copy_audio:
+        cmd.extend(["-c:a", "copy"])
+    else:
+        cmd.extend(["-c:a", "aac", "-b:a", "128k"])
+
+    if not dur:
+        cmd.append("-shortest")
+
+    cmd.append(output_mp4_path)
+
     print(f"Running FFmpeg: {' '.join(cmd)}")
     res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     if res.returncode != 0:
