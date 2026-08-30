@@ -37,38 +37,72 @@ def get_youtube_service():
     creds = Credentials.from_authorized_user_info(info)
     return build("youtube", "v3", credentials=creds)
 
-def generate_gemini_summary(title, preacher, scripture, transcript=""):
-    """Calls Google Gemini to generate a warm, 1-paragraph summary for the YouTube description"""
-    if not GEMINI_API_KEY:
-        return ""
+def generate_rich_sermon_description(title, preacher, scripture, display_date, transcript=""):
+    """Generates a complete, structured YouTube description with overview, key themes, practical takeaway, and links"""
+    website_link = "https://victorychristianfellowship.ca/sermons.html"
+    subscribe_link = "https://www.youtube.com/@VictoryChristianFellowship?sub_confirmation=1"
     
-    prompt = f"""You are a church media assistant for Victory Christian Fellowship in Williamsburg, New Brunswick.
-Write an engaging, 1-paragraph sermon summary (3 to 4 sentences) for a Sunday sermon YouTube video description.
+    if not GEMINI_API_KEY:
+        lines = [
+            f"{preacher} delivers a Sunday message titled '{title}' at Victory Christian Fellowship in Williamsburg, New Brunswick.",
+            "",
+            "Connect With Us",
+            "",
+            f"Church Website: {website_link}",
+            f"Subscribe for Weekly Sermons: {subscribe_link}"
+        ]
+        if scripture:
+            lines.append(f"Scripture Reference: {scripture}")
+        lines.append(f"Date Preached: {display_date}")
+        return "\n".join(lines)
+    
+    prompt = f"""You are an expert church media specialist for Victory Christian Fellowship in Williamsburg, New Brunswick.
+Generate a structured YouTube video description based on this sermon info:
 Preacher: {preacher}
-Sermon Title: {title}
+Title: {title}
 Scripture: {scripture if scripture else 'Biblical Teaching'}
-Additional Context/Notes: {transcript[:500] if transcript else ''}
+Date: {display_date}
+Transcript/Context: \"\"\"{transcript[:15000] if transcript else ''}\"\"\"
 
-Rules:
-1. Write 3-4 inspiring sentences summarizing the spiritual core of the sermon.
-2. Do not use hashtags, greetings, bullet points, or sign-offs.
-3. Output only the summary paragraph.
+Format the description EXACTLY like this template:
+
+{preacher} examines biblical teachings in {scripture if scripture else title}—exploring the theological meaning, spiritual significance, and modern application.
+
+Key Themes in This Message
+
+[Theme 1 Title]: [1-2 sentence explanation based on the sermon]
+
+[Theme 2 Title]: [1-2 sentence explanation based on the sermon]
+
+[Theme 3 Title]: [1-2 sentence explanation based on the sermon]
+
+Practical Takeaway
+[1-2 sentences on how believers should apply this message to their daily Christian walk]
+
+Connect With Us
+
+Church Website: {website_link}
+
+Subscribe for Weekly Sermons: {subscribe_link}
+
+Scripture Reference: {scripture if scripture else 'Biblical Teaching'}
+Date Preached: {display_date}
 """
     for model_name in ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.6-flash"]:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
             payload = {"contents": [{"parts": [{"text": prompt}]}]}
-            res = requests.post(url, json=payload, timeout=10)
+            res = requests.post(url, json=payload, timeout=12)
             if res.status_code == 200:
                 data = res.json()
                 if "candidates" in data and data["candidates"]:
-                    summary = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                    if summary:
-                        return summary
+                    desc = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    if desc:
+                        return desc
         except Exception as e:
-            print(f"Gemini summary notice ({model_name}): {e}")
+            print(f"Gemini description notice ({model_name}): {e}")
             
-    return ""
+    return f"{title} | {preacher}\nScripture: {scripture}\nDate Preached: {display_date}\n\nChurch Website: {website_link}\nSubscribe: {subscribe_link}"
 
 def add_video_to_official_playlist(video_id):
     """Adds newly published sermon to top (position 0) of the official playlist"""
@@ -103,28 +137,8 @@ def upload_sermon_to_youtube(video_path, thumbnail_path, title, preacher, displa
     else:
         yt_title = title
 
-    # Generate 1-paragraph AI summary
-    summary_para = generate_gemini_summary(title, preacher, scripture, transcript)
-
-    # Description
-    desc_lines = [
-        f"{title} | {preacher}",
-    ]
-    if scripture:
-        desc_lines.append(f"Scripture: {scripture}")
-    desc_lines.append("Victory Christian Fellowship • Williamsburg, New Brunswick")
-    desc_lines.append(f"Date Preached: {display_date}")
-    desc_lines.append("")
-
-    if summary_para:
-        desc_lines.append(summary_para)
-        desc_lines.append("")
-
-    desc_lines.extend([
-        "Visit our website for more sermons, service times, and resources:",
-        "https://victorychristianfellowship.ca/sermons.html"
-    ])
-    yt_description = "\n".join(desc_lines)
+    # Generate Rich Structured Description (Summary, Themes, Takeaways, Connect Links)
+    yt_description = generate_rich_sermon_description(title, preacher, scripture, display_date, transcript)
 
     tags = ["Victory Christian Fellowship", "VCF Sermons", "Williamsburg NB", "New Brunswick", "Sermon"]
     if preacher:
