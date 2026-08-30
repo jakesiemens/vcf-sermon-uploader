@@ -11,7 +11,10 @@ from config import (
     DEFAULT_PORT, UPLOADS_DIR, OUTPUT_DIR, PREACHERS,
     TOKEN_PATH, CLIENT_SECRET_PATH
 )
-from pipeline.audio_analyzer import extract_audio_snippet, transcribe_audio_snippet, detect_scripture, generate_smart_title
+from pipeline.audio_analyzer import (
+    extract_audio_snippet, transcribe_audio_snippet,
+    detect_scripture, generate_smart_title, analyze_transcript_with_gemini
+)
 from pipeline.video_maker import render_sermon_backdrop, build_video_from_audio
 from pipeline.youtube_uploader import upload_sermon_to_youtube
 from pipeline.site_sync import sync_new_sermon_to_website
@@ -137,6 +140,15 @@ def process_sermon_worker(job_id, audio_path, filename, custom_title, custom_scr
                 transcript = transcribe_audio_snippet(snippet_wav)
                 print(f'[{job_id}] Transcript: {transcript[:100]}...')
             
+            # Use Gemini to intelligently extract title & scripture from what the preacher said
+            if transcript:
+                gemini_res = analyze_transcript_with_gemini(transcript, preacher)
+                if gemini_res:
+                    if not title and gemini_res.get('title'):
+                        title = gemini_res['title']
+                    if not scripture and gemini_res.get('scripture'):
+                        scripture = gemini_res['scripture']
+
             if not scripture:
                 scripture = detect_scripture(transcript)
             if not title:
