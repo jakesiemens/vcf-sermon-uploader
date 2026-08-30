@@ -34,6 +34,10 @@ ARCHIVE_JSON = os.path.join(WEBSITE_DIR, "sermons_youtube_archive_clean.json")
 GITHUB_REPO = os.environ.get("GITHUB_REPO", "jakesiemens/vcf-site")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 
+# Gemini AI Key for YouTube 1-paragraph description summaries
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+OFFICIAL_PLAYLIST_ID = os.environ.get("OFFICIAL_PLAYLIST_ID", "PLGQORcmRVjX0")
+
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
