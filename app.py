@@ -53,6 +53,62 @@ def debug_info():
         "ffmpeg_log": ffmpeg_log
     }), 200
 
+def clean_and_polish_title(raw_title):
+    """Cleans up volunteer typos, casing, file extensions, and punctuation"""
+    if not raw_title:
+        return ""
+    t = raw_title.strip()
+    for ext in ['.mp3', '.m4a', '.wav', '.aac']:
+        if t.lower().endswith(ext):
+            t = t[:-len(ext)].strip()
+            
+    t = t.replace('_', ' ')
+    t = ' '.join(t.split())
+    
+    typo_map = {
+        r'\bchrsitian\b': 'Christian',
+        r'\bchristain\b': 'Christian',
+        r'\bgospal\b': 'Gospel',
+        r'\bgosple\b': 'Gospel',
+        r'\bfellowhip\b': 'Fellowship',
+        r'\bfellowshp\b': 'Fellowship',
+        r'\bauthorty\b': 'Authority',
+        r'\bauthoriy\b': 'Authority',
+        r'\bmesage\b': 'Message',
+        r'\bmessge\b': 'Message',
+        r'\bscriptur\b': 'Scripture',
+        r'\bressurection\b': 'Resurrection'
+    }
+    for pat, repl in typo_map.items():
+        t = re.sub(pat, repl, t, flags=re.IGNORECASE)
+        
+    minor_words = {'a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'in', 'nor', 'of', 'on', 'or', 'so', 'the', 'to', 'up', 'yet', 'with'}
+    words = t.split()
+    if words:
+        polished = []
+        for i, w in enumerate(words):
+            lower_w = w.lower()
+            if i == 0 or i == len(words) - 1 or lower_w not in minor_words:
+                polished.append(w.capitalize() if w.islower() or w.isupper() else w)
+            else:
+                polished.append(lower_w)
+        t = ' '.join(polished)
+        
+    return t
+
+def clean_and_polish_scripture(raw_scripture):
+    """Standardizes volunteer scripture formatting (e.g. rom 8 1 11 -> Romans 8:1-11)"""
+    if not raw_scripture:
+        return ""
+    s = raw_scripture.strip()
+    s = s.replace(';', ':').replace(',', ':')
+    s = ' '.join(s.split())
+    m = re.match(r'^([0-9]?\s*[A-Za-z]+)\s+([0-9]{1,3})\s+([0-9]{1,3}(?:\s*[-–]\s*[0-9]{1,3})?)$', s)
+    if m:
+        book, chap, v = m.groups()
+        return f"{book.title()} {chap}:{v.replace(' ', '')}"
+    return s.title()
+
 def process_sermon_worker(job_id, audio_path, filename, custom_title, custom_scripture, preacher, preached_date_iso, privacy):
     try:
         try:
@@ -62,21 +118,21 @@ def process_sermon_worker(job_id, audio_path, filename, custom_title, custom_scr
             dt = datetime.now()
             display_date = dt.strftime('%B %d, %Y')
 
-        # Step 2: AI Analysis
+        # Step 2: AI Analysis & Title Polish
         JOBS[job_id].update({
             'step': 2,
             'step_name': 'ai',
             'progress': 30,
-            'message': 'AI analyzing sermon audio, title, and scripture...'
+            'message': 'Analyzing sermon audio, title, and scripture...'
         })
 
-        title = custom_title
-        scripture = custom_scripture
+        title = clean_and_polish_title(custom_title)
+        scripture = clean_and_polish_scripture(custom_scripture)
+        transcript = ''
 
         if not title or not scripture:
             print(f'[{job_id}] Extracting snippet for AI analysis...')
-            snippet_wav = extract_audio_snippet(audio_path, duration_seconds=75)
-            transcript = ''
+            snippet_wav = extract_audio_snippet(audio_path, duration_seconds=90)
             if snippet_wav and os.path.exists(snippet_wav):
                 transcript = transcribe_audio_snippet(snippet_wav)
                 print(f'[{job_id}] Transcript: {transcript[:100]}...')
@@ -89,7 +145,7 @@ def process_sermon_worker(job_id, audio_path, filename, custom_title, custom_scr
         if not title:
             title = 'Sunday Morning Message'
 
-        print(f'[{job_id}] Final Title: {title} | Scripture: {scripture} | Preacher: {preacher}')
+        print(f'[{job_id}] Polished Title: {title} | Scripture: {scripture} | Preacher: {preacher}')
 
         # Step 3: Video Generation (Fast 1fps)
         JOBS[job_id].update({
@@ -131,7 +187,8 @@ def process_sermon_worker(job_id, audio_path, filename, custom_title, custom_scr
                 preacher=preacher,
                 display_date=display_date,
                 scripture=scripture,
-                privacy_status=privacy
+                privacy_status=privacy,
+                transcript=transcript
             )
             video_id = yt_res['video_id']
             youtube_url = yt_res['url']
