@@ -18,16 +18,47 @@ BIBLE_BOOKS = [
 
 BOOKS_REGEX = re.compile(r'\\b(' + '|'.join(BIBLE_BOOKS) + r')\\s+([0-9]{1,3})(?:\\s*[:vV,]\\s*([0-9]{1,3}(?:\\s*[-–]\\s*[0-9]{1,3})?))?\\b', re.IGNORECASE)
 
+import requests
+import json
+from config import FFMPEG_BIN, UPLOADS_DIR, GEMINI_API_KEY
+
+def get_audio_duration_seconds(audio_path):
+    """Accurately extracts audio length in seconds using ffprobe"""
+    try:
+        cmd = [
+            "ffprobe", "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            audio_path
+        ]
+        out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True).strip()
+        val = float(out)
+        if val > 0:
+            return int(val)
+    except:
+        pass
+    return None
+
 def extract_audio_snippet(input_path, duration_seconds=90):
-    """Extracts 2 strategic clips (minutes 2:30-4:00 and 4:30-6:00) for scripture & sermon theme detection"""
+    """Extracts strategic clips based on audio duration (starts at 0s for short recordings, or 0s + 2m for full sermons)"""
     base_name = os.path.splitext(os.path.basename(input_path))[0]
     out_wav = os.path.join(UPLOADS_DIR, f"{base_name}_snippet.wav")
     
-    # Sample starting at 2m 30s (150s) where sermon theme and scripture reading begin
+    total_dur = get_audio_duration_seconds(input_path) or 60
+    
+    # If audio is under 3 minutes (like a short recording or exhortation), start at 0s!
+    if total_dur < 180:
+        start_sec = 0
+        dur_to_extract = min(60, total_dur)
+    else:
+        # Full sermon: sample from 2 minutes (120s) where scripture is read and title announced
+        start_sec = 120
+        dur_to_extract = min(80, total_dur - start_sec)
+        
     cmd = [
         FFMPEG_BIN, "-y",
-        "-ss", "150",
-        "-t", "85",
+        "-ss", str(start_sec),
+        "-t", str(dur_to_extract),
         "-i", input_path,
         "-ar", "16000",
         "-ac", "1",
@@ -37,7 +68,7 @@ def extract_audio_snippet(input_path, duration_seconds=90):
     return out_wav if os.path.exists(out_wav) else None
 
 def transcribe_audio_snippet(wav_path):
-    """Transcribes WAV snippet in fast 20-second chunks"""
+    """Transcribes WAV snippet in fast 18-second chunks"""
     if not wav_path or not os.path.exists(wav_path):
         return ""
     recognizer = sr.Recognizer()
@@ -47,7 +78,7 @@ def transcribe_audio_snippet(wav_path):
         with sr.AudioFile(wav_path) as source:
             for i in range(4):
                 try:
-                    audio = recognizer.record(source, duration=20)
+                    audio = recognizer.record(source, duration=18)
                     text = recognizer.recognize_google(audio)
                     if text:
                         full_text.append(text)
@@ -66,6 +97,42 @@ def transcribe_audio_snippet(wav_path):
                 os.remove(wav_path)
         except:
             pass
+
+def analyze_transcript_with_gemini(transcript, preacher=""):
+    """Uses Gemini to extract title, scripture, and 1-paragraph summary from transcript"""
+    if not GEMINI_API_KEY or not transcript or len(transcript.strip()) < 15:
+        return None
+        
+    prompt = f"""You are a church media assistant for Victory Christian Fellowship in Williamsburg, New Brunswick.
+Analyze this sermon/message audio transcript:
+Transcript: \"\"\"{transcript}\"\"\"
+
+Task:
+1. Identify the exact Scripture reference (e.g. 'Mark 2:1-10') mentioned by the speaker. If none, leave blank.
+2. Identify the exact Title given by the preacher (e.g. 'Son, Thy Sins Be Forgiven Thee'). If none given, formulate a 3-5 word authentic title based on the main topic.
+3. Write an engaging, 1-paragraph summary (3-4 sentences) for the YouTube video description based directly on what the preacher actually said.
+
+Format as JSON:
+{{"title": "...", "scripture": "...", "summary": "..."}}
+"""
+    for model_name in ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.6-flash"]:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"response_mime_type": "application/json"}
+            }
+            res = requests.post(url, json=payload, timeout=8)
+            if res.status_code == 200:
+                data = res.json()
+                if "candidates" in data and data["candidates"]:
+                    raw_json = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    parsed = json.loads(raw_json)
+                    return parsed
+        except Exception as e:
+            print(f"Gemini analysis notice ({model_name}): {e}")
+            
+    return None
 
 def detect_scripture(transcript):
     """Detects Bible book, chapter, and verse references from transcript"""
