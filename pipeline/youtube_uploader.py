@@ -4,39 +4,64 @@ import time
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-from config import TOKEN_PATH, CLIENT_SECRET_PATH
+import requests
+from config import TOKEN_PATH, CLIENT_SECRET_PATH, GEMINI_API_KEY, OFFICIAL_PLAYLIST_ID
 
-def get_youtube_service():
-    """Initializes authenticated YouTube API client from env var or file"""
-    info = None
+def generate_gemini_summary(title, preacher, scripture, transcript=""):
+    """Calls Google Gemini to generate a warm, 1-paragraph summary for the YouTube description"""
+    if not GEMINI_API_KEY:
+        return ""
+    
+    prompt = f"""You are a church media assistant for Victory Christian Fellowship in Williamsburg, New Brunswick.
+Write an engaging, 1-paragraph sermon summary (3 to 4 sentences) for a Sunday sermon YouTube video description.
+Preacher: {preacher}
+Sermon Title: {title}
+Scripture: {scripture if scripture else 'Biblical Teaching'}
+Additional Context/Notes: {transcript[:500] if transcript else ''}
 
-    # 1. Try direct environment variable
-    env_token = os.environ.get("YOUTUBE_TOKEN_JSON", "").strip()
-    if env_token:
+Rules:
+1. Write 3-4 inspiring sentences summarizing the spiritual core of the sermon.
+2. Do not use hashtags, greetings, bullet points, or sign-offs.
+3. Output only the summary paragraph.
+"""
+    for model_name in ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.6-flash"]:
         try:
-            if (env_token.startswith("'") and env_token.endswith("'")) or (env_token.startswith('"') and env_token.endswith('"')):
-                env_token = env_token[1:-1].strip()
-            info = json.loads(env_token)
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+            payload = {"contents": [{"parts": [{"text": prompt}]}]}
+            res = requests.post(url, json=payload, timeout=10)
+            if res.status_code == 200:
+                data = res.json()
+                if "candidates" in data and data["candidates"]:
+                    summary = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    if summary:
+                        return summary
         except Exception as e:
-            print(f"Warning: Could not parse YOUTUBE_TOKEN_JSON env var: {e}")
+            print(f"Gemini summary notice ({model_name}): {e}")
+            
+    return ""
 
-    # 2. Try token file
-    if not info and os.path.exists(TOKEN_PATH):
-        try:
-            with open(TOKEN_PATH, "r", encoding="utf-8") as f:
-                content = f.read().strip()
-                if content:
-                    info = json.loads(content)
-        except Exception as e:
-            print(f"Warning: Could not parse {TOKEN_PATH}: {e}")
+def add_video_to_official_playlist(video_id):
+    """Adds newly published sermon to top (position 0) of the official playlist"""
+    if not OFFICIAL_PLAYLIST_ID:
+        return
+    try:
+        yt = get_youtube_service()
+        body = {
+            "snippet": {
+                "playlistId": OFFICIAL_PLAYLIST_ID,
+                "position": 0,
+                "resourceId": {
+                    "kind": "youtube#video",
+                    "videoId": video_id
+                }
+            }
+        }
+        yt.playlistItems().insert(part="snippet", body=body).execute()
+        print(f"Added video {video_id} to top of official playlist {OFFICIAL_PLAYLIST_ID}")
+    except Exception as e:
+        print(f"Playlist insertion notice: {e}")
 
-    if not info:
-        raise RuntimeError("YouTube authentication token not configured. Please add YOUTUBE_TOKEN_JSON under Environment in Render.")
-
-    creds = Credentials.from_authorized_user_info(info)
-    return build("youtube", "v3", credentials=creds)
-
-def upload_sermon_to_youtube(video_path, thumbnail_path, title, preacher, display_date, scripture="", privacy_status="public"):
+def upload_sermon_to_youtube(video_path, thumbnail_path, title, preacher, display_date, scripture="", privacy_status="public", transcript=""):
     """Uploads MP4 video and custom thumbnail to YouTube channel"""
     youtube = get_youtube_service()
 
@@ -48,16 +73,24 @@ def upload_sermon_to_youtube(video_path, thumbnail_path, title, preacher, displa
     else:
         yt_title = title
 
+    # Generate 1-paragraph AI summary
+    summary_para = generate_gemini_summary(title, preacher, scripture, transcript)
+
     # Description
     desc_lines = [
         f"{title} | {preacher}",
     ]
     if scripture:
         desc_lines.append(f"Scripture: {scripture}")
+    desc_lines.append("Victory Christian Fellowship • Williamsburg, New Brunswick")
+    desc_lines.append(f"Date Preached: {display_date}")
+    desc_lines.append("")
+
+    if summary_para:
+        desc_lines.append(summary_para)
+        desc_lines.append("")
+
     desc_lines.extend([
-        "Victory Christian Fellowship • Williamsburg, New Brunswick",
-        f"Date Preached: {display_date}",
-        "",
         "Visit our website for more sermons, service times, and resources:",
         "https://victorychristianfellowship.ca/sermons.html"
     ])
@@ -105,6 +138,9 @@ def upload_sermon_to_youtube(video_path, thumbnail_path, title, preacher, displa
             print(f"Thumbnail uploaded for {video_id}")
         except Exception as e:
             print(f"Thumbnail upload error (may retry later): {e}")
+
+    # Add to Official Chronological Playlist at position 0 (top)
+    add_video_to_official_playlist(video_id)
 
     return {
         "video_id": video_id,
