@@ -52,16 +52,20 @@ def sync_new_sermon_to_website(video_id, title, preacher, preached_date_iso, dis
         with open(ARCHIVE_JSON, "w", encoding="utf-8") as f:
             json.dump(archive, f, indent=2, ensure_ascii=False)
 
+        git_pushed = False
         try:
             subprocess.run(["git", "add", "sermons_youtube_archive_clean.json"], cwd=WEBSITE_DIR, check=True)
             subprocess.run(["git", "commit", "-m", f"Add new sermon: {title}"], cwd=WEBSITE_DIR, check=True)
             subprocess.run(["git", "push", "origin", "main"], cwd=WEBSITE_DIR, check=True)
             print("Successfully synced and pushed new sermon to GitHub Pages via local git!")
+            git_pushed = True
         except Exception as e:
-            print(f"Warning: Git push failed: {e}")
-        return True
+            print(f"Warning: Local git push failed: {e}. Falling back to GitHub REST API...")
 
-    # Case 2: Cloud execution via GitHub REST API
+        if git_pushed:
+            return True
+
+    # Case 2: Cloud execution or fallback via GitHub REST API
     api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/sermons_youtube_archive_clean.json"
     headers = {
         "Accept": "application/vnd.github.v3+json",
