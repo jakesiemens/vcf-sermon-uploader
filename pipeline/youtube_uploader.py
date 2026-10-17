@@ -32,77 +32,85 @@ def get_youtube_service():
             print(f"Warning: Could not parse {TOKEN_PATH}: {e}")
 
     if not info:
-        raise RuntimeError("YouTube authentication token not configured. Please add YOUTUBE_TOKEN_JSON under Environment in Render.")
+        raise RuntimeError("YouTube authentication token not found. Please run reauth.bat or reauth_youtube.py to log in.")
 
-    creds = Credentials.from_authorized_user_info(info)
-    return build("youtube", "v3", credentials=creds)
+    try:
+        from google.auth.transport.requests import Request
+        creds = Credentials.from_authorized_user_info(info)
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            # Save updated refreshed token
+            try:
+                with open(TOKEN_PATH, "w", encoding="utf-8") as f:
+                    f.write(creds.to_json())
+            except Exception:
+                pass
+        return build("youtube", "v3", credentials=creds)
+    except Exception as e:
+        err_msg = str(e)
+        if "invalid_grant" in err_msg or "expired" in err_msg.lower():
+            raise RuntimeError("YouTube token has expired (Google 7-day limit in Testing mode). Please run reauth.bat or reauth_youtube.py to re-authenticate.")
+        raise
 
-def generate_rich_sermon_description(title, preacher, scripture, display_date, transcript=""):
-    """Generates a complete, structured YouTube description with overview, key themes, practical takeaway, and links"""
+def generate_rich_sermon_description(title, preacher, scripture, display_date, transcript="", ai_details=None):
+    """Generates a complete, structured YouTube description with overview, key themes, practical takeaway, timestamps, and links"""
     website_link = "https://victorychristianfellowship.ca/sermons.html"
     subscribe_link = "https://www.youtube.com/@VictoryChristianFellowship?sub_confirmation=1"
     
-    if not GEMINI_API_KEY:
-        lines = [
-            f"{preacher} delivers a Sunday message titled '{title}' at Victory Christian Fellowship in Williamsburg, New Brunswick.",
-            "",
-            "Connect With Us",
-            "",
-            f"Church Website: {website_link}",
-            f"Subscribe for Weekly Sermons: {subscribe_link}"
-        ]
-        if scripture:
-            lines.append(f"Scripture Reference: {scripture}")
-        lines.append(f"Date Preached: {display_date}")
-        return "\n".join(lines)
-    
-    prompt = f"""You are an expert church media specialist for Victory Christian Fellowship in Williamsburg, New Brunswick.
-Generate a structured YouTube video description based on this sermon info:
-Preacher: {preacher}
-Title: {title}
-Scripture: {scripture if scripture else 'Biblical Teaching'}
-Date: {display_date}
-Transcript/Context: \"\"\"{transcript[:15000] if transcript else ''}\"\"\"
+    sections = []
 
-Format the description EXACTLY like this template:
+    # 1. Overview
+    summary = ""
+    key_themes = []
+    practical_takeaway = ""
+    timestamps = []
 
-{preacher} examines biblical teachings in {scripture if scripture else title}—exploring the theological meaning, spiritual significance, and modern application.
+    if isinstance(ai_details, dict):
+        summary = ai_details.get("one_sentence_summary", "")
+        key_themes = ai_details.get("key_themes", [])
+        practical_takeaway = ai_details.get("practical_takeaway", "")
+        timestamps = ai_details.get("timestamps", [])
 
-Key Themes in This Message
+    if summary:
+        sections.append(f"{preacher} delivers a Sunday message titled '{title}' from {scripture if scripture else 'Scripture'} at Victory Christian Fellowship in Williamsburg, New Brunswick.\n\n{summary}")
+    else:
+        sections.append(f"{preacher} examines biblical teachings in {scripture if scripture else title}—exploring the theological meaning, spiritual significance, and modern application for believers today.")
 
-[Theme 1 Title]: [1-2 sentence explanation based on the sermon]
+    # 2. Key Themes
+    if key_themes:
+        theme_lines = ["Key Themes in This Message\n"]
+        for t in key_themes:
+            t_name = t.get("theme", "")
+            t_exp = t.get("explanation", "")
+            theme_lines.append(f"• {t_name}: {t_exp}")
+        sections.append("\n".join(theme_lines))
 
-[Theme 2 Title]: [1-2 sentence explanation based on the sermon]
+    # 3. Practical Takeaway
+    if practical_takeaway:
+        sections.append(f"Practical Takeaway\n{practical_takeaway}")
 
-[Theme 3 Title]: [1-2 sentence explanation based on the sermon]
+    # 4. Video Chapters & Timestamps (YouTube Native Chapters)
+    if timestamps and len(timestamps) > 0:
+        ts_lines = ["Video Chapters & Timestamps:"]
+        for ts in timestamps:
+            time_str = ts.get("time", "")
+            ts_title = ts.get("title", "")
+            # Ensure time format has at least m:ss
+            ts_lines.append(f"{time_str} - {ts_title}")
+        sections.append("\n".join(ts_lines))
 
-Practical Takeaway
-[1-2 sentences on how believers should apply this message to their daily Christian walk]
+    # 5. Connect With Us & Reference Info
+    connect_lines = [
+        "Connect With Us",
+        f"Church Website: {website_link}",
+        f"Subscribe for Weekly Sermons: {subscribe_link}",
+        "",
+        f"Scripture Reference: {scripture if scripture else 'Biblical Teaching'}",
+        f"Date Preached: {display_date}"
+    ]
+    sections.append("\n".join(connect_lines))
 
-Connect With Us
-
-Church Website: {website_link}
-
-Subscribe for Weekly Sermons: {subscribe_link}
-
-Scripture Reference: {scripture if scripture else 'Biblical Teaching'}
-Date Preached: {display_date}
-"""
-    for model_name in ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.6-flash"]:
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
-            payload = {"contents": [{"parts": [{"text": prompt}]}]}
-            res = requests.post(url, json=payload, timeout=12)
-            if res.status_code == 200:
-                data = res.json()
-                if "candidates" in data and data["candidates"]:
-                    desc = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                    if desc:
-                        return desc
-        except Exception as e:
-            print(f"Gemini description notice ({model_name}): {e}")
-            
-    return f"{title} | {preacher}\nScripture: {scripture}\nDate Preached: {display_date}\n\nChurch Website: {website_link}\nSubscribe: {subscribe_link}"
+    return "\n\n".join(sections)
 
 def add_video_to_official_playlist(video_id):
     """Adds newly published sermon to top (position 0) of the official playlist"""
@@ -125,7 +133,7 @@ def add_video_to_official_playlist(video_id):
     except Exception as e:
         print(f"Playlist insertion notice: {e}")
 
-def upload_sermon_to_youtube(video_path, thumbnail_path, title, preacher, display_date, scripture="", privacy_status="public", transcript=""):
+def upload_sermon_to_youtube(video_path, thumbnail_path, title, preacher, display_date, scripture="", privacy_status="public", transcript="", ai_details=None):
     """Uploads MP4 video and custom thumbnail to YouTube channel"""
     youtube = get_youtube_service()
 
@@ -137,8 +145,8 @@ def upload_sermon_to_youtube(video_path, thumbnail_path, title, preacher, displa
     else:
         yt_title = title
 
-    # Generate Rich Structured Description (Summary, Themes, Takeaways, Connect Links)
-    yt_description = generate_rich_sermon_description(title, preacher, scripture, display_date, transcript)
+    # Generate Rich Structured Description with Chapters & Timestamps
+    yt_description = generate_rich_sermon_description(title, preacher, scripture, display_date, transcript, ai_details=ai_details)
 
     tags = ["Victory Christian Fellowship", "VCF Sermons", "Williamsburg NB", "New Brunswick", "Sermon"]
     if preacher:
@@ -164,10 +172,24 @@ def upload_sermon_to_youtube(video_path, thumbnail_path, title, preacher, displa
     request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
     
     response = None
+    retry_count = 0
+    max_retries = 5
     while response is None:
-        status, response = request.next_chunk()
-        if status:
-            print(f"Uploaded {int(status.progress() * 100)}%")
+        try:
+            status, response = request.next_chunk()
+            if status:
+                print(f"Uploaded {int(status.progress() * 100)}%")
+            retry_count = 0
+        except Exception as e:
+            err_str = str(e)
+            if "quota" in err_str.lower():
+                raise
+            retry_count += 1
+            if retry_count > max_retries:
+                raise RuntimeError(f"Network error during YouTube upload after {max_retries} retries: {e}")
+            sleep_time = min(30, 2 ** retry_count)
+            print(f"Upload chunk interrupted ({e}). Retrying in {sleep_time}s (attempt {retry_count}/{max_retries})...")
+            time.sleep(sleep_time)
     
     video_id = response.get("id")
     print(f"Video uploaded successfully! Video ID: {video_id}")

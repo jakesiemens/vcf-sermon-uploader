@@ -1,753 +1,739 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VCF Sermon Publisher | Victory Christian Fellowship</title>
-    <link rel="icon" type="image/png" href="/static/favicon.png">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary: #1e3142;
-            --primary-dark: #14222e;
-            --orange: #EA642A;
-            --orange-hover: #CE5119;
-            --orange-light: #F79468;
-            --bg: #F4F7FA;
-            --card-bg: #FFFFFF;
-            --border: #CBD5E1;
-            --text-dark: #1A202C;
-            --text-muted: #64748B;
-            --radius: 10px;
-            --shadow: 0 10px 25px -5px rgba(0,0,0,0.06), 0 8px 10px -6px rgba(0,0,0,0.04);
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg);
-            color: var(--text-dark);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        header {
-            background: var(--primary);
-            color: white;
-            padding: 20px 24px;
-            border-bottom: 4px solid var(--orange);
-        }
-        .header-content {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            max-width: 820px;
-            margin: 0 auto;
-            width: 100%;
-        }
-        .header-logo {
-            height: 46px;
-            width: auto;
-        }
-        .header-titles h1 {
-            font-size: 1.25rem;
-            font-weight: 700;
-        }
-        .header-titles p {
-            font-size: 0.85rem;
-            color: #94AEC5;
-        }
-        .container {
-            max-width: 820px;
-            margin: 28px auto;
-            padding: 0 20px;
-            width: 100%;
-            flex: 1;
-        }
-        .card {
-            background: var(--card-bg);
-            border-radius: var(--radius);
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow);
-            padding: 32px;
-            margin-bottom: 24px;
-        }
-        .card-header {
-            margin-bottom: 24px;
-        }
-        .card-header h2 {
-            font-family: 'Lora', serif;
-            font-size: 1.5rem;
-            color: var(--primary);
-            margin-bottom: 6px;
-        }
-        .card-header p {
-            color: var(--text-muted);
-            font-size: 0.95rem;
-        }
-        
-        /* FOOLPROOF FILE SELECTOR */
-        .upload-section {
-            background: #F8FAFC;
-            border: 2px dashed var(--orange);
-            border-radius: var(--radius);
-            padding: 28px;
-            text-align: center;
-            cursor: pointer;
-            transition: background 0.2s;
-            position: relative;
-        }
-        .upload-section:hover {
-            background: #FFF7ED;
-        }
-        .upload-icon {
-            font-size: 40px;
-            margin-bottom: 10px;
-        }
-        .upload-title {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: var(--primary);
-            margin-bottom: 6px;
-        }
-        .upload-desc {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            margin-bottom: 16px;
-        }
-        .native-file-input {
-            font-size: 1rem;
-            color: var(--text-dark);
-            cursor: pointer;
-            padding: 10px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            background: white;
-            max-width: 400px;
-            width: 100%;
-            display: inline-block;
-        }
-        
-        /* SELECTED FILE BANNER */
-        .file-selected-box {
-            display: none;
-            background: #F0FDF4;
-            border: 2px solid #10B981;
-            border-radius: var(--radius);
-            padding: 18px 20px;
-            margin-top: 18px;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .file-selected-box.active {
-            display: flex;
-        }
-        .file-name-text {
-            font-size: 1.05rem;
-            font-weight: 700;
-            color: #065F46;
-            word-break: break-all;
-        }
-        .file-size-text {
-            font-size: 0.88rem;
-            color: #047857;
-            margin-top: 4px;
-        }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-top: 24px;
-        }
-        @media (max-width: 640px) {
-            .form-grid { grid-template-columns: 1fr; }
-        }
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        .form-group.full-width {
-            grid-column: 1 / -1;
-        }
-        label {
-            font-size: 0.88rem;
-            font-weight: 600;
-            color: var(--primary);
-        }
-        label .badge {
-            font-size: 0.72rem;
-            background: #E2E8F0;
-            color: #475569;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-weight: normal;
-            margin-left: 6px;
-        }
-        label .ai-badge {
-            background: #FFEDD5;
-            color: #C2410C;
-            font-weight: 600;
-        }
-        input[type="text"], input[type="date"], select {
-            padding: 12px 14px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-size: 0.95rem;
-            font-family: inherit;
-            background: white;
-            color: var(--text-dark);
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        input:focus, select:focus {
-            border-color: var(--orange);
-            box-shadow: 0 0 0 3px rgba(234, 100, 42, 0.15);
-        }
-        .helper-text {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-        }
-        .submit-btn {
-            background: var(--orange);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 18px 24px;
-            font-size: 1.15rem;
-            font-weight: 700;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            box-shadow: 0 4px 12px rgba(234, 100, 42, 0.25);
-            transition: all 0.2s ease;
-        }
-        .submit-btn:hover:not(:disabled) {
-            background: var(--orange-hover);
-            transform: translateY(-1px);
-        }
-        .submit-btn:disabled {
-            background: #94A3B8;
-            cursor: not-allowed;
-            box-shadow: none;
-            transform: none;
-        }
-
-        .alert-error {
-            display: none;
-            background: #FEF2F2;
-            border: 1px solid #F87171;
-            color: #991B1B;
-            border-radius: 8px;
-            padding: 14px 18px;
-            margin-top: 18px;
-            font-weight: 600;
-        }
-        .alert-error.active {
-            display: block;
-        }
-
-        .progress-box {
-            display: none;
-            background: white;
-            border-radius: var(--radius);
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow);
-            padding: 32px;
-            margin-top: 24px;
-        }
-        .progress-box.active {
-            display: block;
-        }
-        .progress-bar-container {
-            width: 100%;
-            height: 14px;
-            background: #E2E8F0;
-            border-radius: 7px;
-            overflow: hidden;
-            margin: 16px 0 20px;
-        }
-        .progress-bar-fill {
-            height: 100%;
-            width: 0%;
-            background: var(--orange);
-            transition: width 0.3s ease;
-        }
-        .progress-title {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: var(--primary);
-        }
-        .steps-list {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-top: 14px;
-        }
-        .step-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 0.95rem;
-            color: #64748B;
-        }
-        .step-item.active {
-            color: var(--orange);
-            font-weight: 600;
-        }
-        .step-item.done {
-            color: #10B981;
-            font-weight: 600;
-        }
-        .step-icon {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #E2E8F0;
-            font-size: 12px;
-        }
-        .step-item.active .step-icon {
-            background: #FFEDD5;
-            color: var(--orange);
-        }
-        .step-item.done .step-icon {
-            background: #D1FAE5;
-            color: #059669;
-        }
-        .success-box {
-            display: none;
-            background: #ECFDF5;
-            border: 2px solid #10B981;
-            border-radius: var(--radius);
-            padding: 32px 24px;
-            margin-top: 24px;
-            text-align: center;
-        }
-        .success-box.active {
-            display: block;
-        }
-        .btn-group {
-            display: flex;
-            gap: 14px;
-            justify-content: center;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }
-        .btn-action {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 22px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 0.95rem;
-        }
-        .btn-yt {
-            background: #FF0000;
-            color: white;
-        }
-        .btn-site {
-            background: var(--primary);
-            color: white;
-        }
-        footer {
-            text-align: center;
-            padding: 20px;
-            color: var(--text-muted);
-            font-size: 0.85rem;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sermon Publisher | Victory Christian Fellowship</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{--primary:#1e3142;--orange:#EA642A;--orange-hover:#CE5119;--bg:#F4F7FA;--border:#CBD5E1;--text:#1A202C;--muted:#64748B;--ok:#10B981;--warning:#D97706;--radius:10px;--shadow:0 10px 25px -5px rgba(0,0,0,.06),0 8px 10px -6px rgba(0,0,0,.04)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+header{background:var(--primary);color:#fff;padding:20px 24px;border-bottom:4px solid var(--orange)}
+.header-content{display:flex;align-items:center;gap:16px;max-width:820px;margin:0 auto}
+.header-logo{height:46px;width:auto}
+header h1{font-size:1.25rem}
+header p{font-size:.85rem;color:#94AEC5}
+.container{max-width:820px;margin:28px auto;padding:0 20px;width:100%;flex:1}
+.card,.progress-box{background:#fff;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);padding:32px;margin-bottom:24px}
+.card h2{font-family:Lora,serif;font-size:1.5rem;color:var(--primary);margin-bottom:6px}
+.card>p,.helper{color:var(--muted);font-size:.95rem}
+.helper{font-size:.8rem}
+.dropzone{display:block;margin-top:24px;background:#F8FAFC;border:2px dashed var(--orange);border-radius:var(--radius);padding:28px;text-align:center;cursor:pointer;transition:background .2s}
+.dropzone:hover,.dropzone:focus-within,.dropzone.drag{background:#FFF7ED}
+.dropzone.disabled{cursor:not-allowed;opacity:.65}
+.dropzone input{position:absolute;opacity:0;width:1px;height:1px}
+.dropzone .icon{font-size:40px}
+.dropzone strong{display:block;font-size:1.2rem;color:var(--primary);margin:6px 0}
+.dropzone span.hint{font-size:.9rem;color:var(--muted)}
+.file-box{display:none;align-items:center;justify-content:space-between;gap:12px;background:#F0FDF4;border:2px solid var(--ok);border-radius:var(--radius);padding:16px 20px;margin-top:16px}
+.file-box.active{display:flex}
+.file-name{font-weight:700;color:#065F46;word-break:break-word}
+.file-size{font-size:.88rem;color:#047857;margin-top:4px}
+.btn-clear{background:#FEE2E2;color:#991B1B;border:1px solid #F87171;border-radius:6px;padding:6px 12px;font-weight:600;cursor:pointer}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}.card,.progress-box{padding:22px}.header-logo{height:40px}}
+.group{display:flex;flex-direction:column;gap:6px}
+.full{grid-column:1/-1}
+label{font-size:.88rem;font-weight:600;color:var(--primary)}
+.badge{font-size:.72rem;background:#E2E8F0;color:#475569;padding:2px 6px;border-radius:4px;font-weight:400;margin-left:6px}
+.badge.ai{background:#FFEDD5;color:#C2410C;font-weight:600}
+input[type=text],input[type=date],select{padding:12px 14px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:.95rem;background:#fff;color:var(--text);min-width:0}
+input:disabled,select:disabled,button:disabled{opacity:.65;cursor:not-allowed}
+input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid rgba(234,100,42,.4);outline-offset:1px;border-color:var(--orange)}
+.submit{background:var(--orange);color:#fff;border:0;border-radius:8px;padding:18px 24px;font-size:1.15rem;font-weight:700;cursor:pointer;width:100%;margin-top:24px;box-shadow:0 4px 12px rgba(234,100,42,.25);transition:background .2s,transform .2s}
+.submit:hover:not(:disabled){background:var(--orange-hover);transform:translateY(-1px)}
+.submit:disabled{background:#94A3B8;box-shadow:none}
+.alert{display:none;background:#FEF2F2;border:1px solid #F87171;color:#991B1B;border-radius:8px;padding:14px 18px;margin-top:18px;font-weight:600;white-space:pre-line}
+.alert.active{display:block}
+.progress-box,.success{display:none}
+.progress-box.active{display:block}
+.progress-title{font-size:1.2rem;font-weight:700;color:var(--primary)}
+.status-note{margin-top:8px;color:var(--muted);font-size:.88rem;min-height:1.2em}
+.bar{height:14px;background:#E2E8F0;border-radius:7px;overflow:hidden;margin:16px 0 20px}
+.bar div{height:100%;width:0;background:var(--orange);transition:width .3s}
+.steps{list-style:none;display:flex;flex-direction:column;gap:12px}
+.step{display:flex;align-items:center;gap:12px;font-size:.95rem;color:var(--muted)}
+.step i{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#E2E8F0;font:normal 12px Inter,sans-serif;flex:0 0 24px}
+.step.active{color:var(--orange);font-weight:600}.step.active i{background:#FFEDD5}
+.step.done{color:var(--ok);font-weight:600}.step.done i{background:#D1FAE5;color:#059669}
+.success{background:#ECFDF5;border:2px solid var(--ok);border-radius:var(--radius);padding:32px 24px;text-align:center}
+.success.warning{background:#FFFBEB;border-color:#F59E0B}
+.success.active{display:block}
+.success h3{color:#065F46;font-size:1.4rem;margin-bottom:8px}
+.success.warning h3{color:#92400E}
+.success p{color:#047857;font-size:1.05rem}
+.success.warning p{color:#92400E}
+.btns{display:flex;gap:14px;justify-content:center;margin-top:20px;flex-wrap:wrap}
+.btn{display:inline-block;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600;border:0;cursor:pointer;font-size:.95rem;color:#fff}
+.btn[hidden]{display:none}
+.btn-yt{background:#E00000}.btn-site{background:var(--primary)}.btn-again{background:#fff;color:var(--primary);border:1px solid var(--border)}
+footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
 </head>
 <body>
-
 <header>
-    <div class="header-content">
-        <img src="/static/logo.png" alt="Victory Christian Fellowship" class="header-logo">
-        <div class="header-titles">
-            <h1>Sermon Publishing Portal</h1>
-            <p>Victory Christian Fellowship • Automated Audio-to-YouTube Pipeline</p>
-        </div>
+  <div class="header-content">
+    <img src="/static/logo.png" alt="Victory Christian Fellowship" class="header-logo">
+    <div>
+      <h1>Sermon Publishing Portal</h1>
+      <p>Victory Christian Fellowship • Automated Audio-to-YouTube Pipeline</p>
     </div>
+  </div>
 </header>
 
-<div class="container">
-    <div class="card">
-        <div class="card-header">
-            <h2>Upload Sunday Sermon</h2>
-            <p>Select your sermon audio file below. AI will transcribe, formulate titles &amp; scriptures, render the 1080p video, and publish to YouTube and our website.</p>
+<main class="container">
+  <div class="card">
+    <h2>Upload Sunday Sermon</h2>
+    <p>Select the sermon audio below. AI will transcribe it, determine the title and scripture when needed, render the 1080p video, and publish it.</p>
+
+    <form id="form" novalidate>
+      <label class="dropzone" id="dropzone" for="audio">
+        <input type="file" id="audio" name="audio" accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.wma" required>
+        <div class="icon" aria-hidden="true">🎙️</div>
+        <strong>Step 1: Choose Audio File</strong>
+        <span class="hint">Click here or drop an MP3, M4A, WAV, AAC, FLAC, OGG, or WMA file</span>
+      </label>
+
+      <div class="file-box" id="file-box" aria-live="polite">
+        <div>
+          <div class="file-name" id="file-name"></div>
+          <div class="file-size" id="file-size"></div>
+        </div>
+        <button type="button" class="btn-clear" id="clear">✕ Clear</button>
+      </div>
+
+      <div class="grid">
+        <div class="group">
+          <label for="preacher">Preacher</label>
+          <select id="preacher" name="preacher">
+            {% if preachers %}
+              {% for p in preachers %}
+              <option value="{{ p }}">{{ p }}</option>
+              {% endfor %}
+            {% else %}
+              <option>Jake Siemens</option><option>Corny Janzen</option><option>Jake Driedger</option>
+              <option>Jerry Mawhorr</option><option>John Banman</option><option>Henry Wall</option>
+              <option>John Enns</option><option>Bernie Bergen</option><option>Aaron Knelsen</option>
+              <option>Seth Janzen</option><option>David Hiebert</option><option>Joe Brubacher</option>
+              <option>Johan Fehr</option><option>Matthew Janzen</option><option>Peter Driedger</option>
+              <option>Henry Klassen</option><option>Mark Villeneuve</option><option>Open Sharing</option>
+              <option>Guest Speaker</option>
+            {% endif %}
+          </select>
+          <input type="text" id="custom-preacher" maxlength="100" autocomplete="name" placeholder="Enter guest preacher name" aria-label="Guest preacher name" hidden>
         </div>
 
-        <form id="sermon-form" enctype="multipart/form-data">
-            <!-- VISIBLE, BULLETPROOF UPLOAD SECTION -->
-            <div class="upload-section" id="dropzone">
-                <div class="upload-icon">🎙️</div>
-                <div class="upload-title">Step 1: Choose Audio File</div>
-                <div class="upload-desc">Supports .MP3, .M4A, .WAV from audio recorders or phones</div>
-                <input type="file" id="audio-file" name="audio" class="native-file-input" accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.wma,.mp4">
-            </div>
-
-            <!-- GREEN SELECTED FILE CONFIRMATION -->
-            <div class="file-selected-box" id="file-selected-box">
-                <div>
-                    <div class="file-name-text" id="file-name-text">✅ No file selected</div>
-                    <div class="file-size-text" id="file-size-text">Ready to upload</div>
-                </div>
-                <button type="button" onclick="clearSelectedFile()" style="background:#FEE2E2; color:#991B1B; border:1px solid #F87171; border-radius:6px; padding:6px 12px; font-weight:600; cursor:pointer;">✕ Clear</button>
-            </div>
-
-            <div class="form-grid">
-                <!-- PREACHER -->
-                <div class="form-group">
-                    <label for="preacher-select">Preacher <span class="badge">Select or type</span></label>
-                    <select id="preacher-select" name="preacher" onchange="handlePreacherChange()">
-                        {% for p in preachers %}
-                        <option value="{{ p }}">{{ p }}</option>
-                        {% endfor %}
-                    </select>
-                    <input type="text" id="custom-preacher" name="custom_preacher" placeholder="Enter guest preacher name" style="display:none; margin-top:8px;">
-                </div>
-
-                <!-- PREACHED DATE -->
-                <div class="form-group">
-                    <label for="preached-date">Date Preached <span class="badge">Defaults to Sunday</span></label>
-                    <input type="date" id="preached-date" name="preached_date" value="{{ default_date }}" required>
-                </div>
-
-                <!-- TITLE (OPTIONAL / AI) -->
-                <div class="form-group full-width">
-                    <label for="sermon-title">Sermon Title <span class="badge ai-badge">Optional - AI Auto Detects</span></label>
-                    <input type="text" id="sermon-title" name="title" placeholder="Leave blank to let AI listen and generate the title automatically">
-                    <span class="helper-text">If the preacher gave you a title, enter it here. Otherwise, AI will listen to the audio and formulate the title.</span>
-                </div>
-
-                <!-- SCRIPTURE (OPTIONAL) -->
-                <div class="form-group full-width">
-                    <label for="scripture-ref">Scripture Passage <span class="badge ai-badge">Optional - AI Detects</span></label>
-                    <input type="text" id="scripture-ref" name="scripture" placeholder="e.g. Romans 8:1-11 (Optional)">
-                    <span class="helper-text">AI automatically listens for scripture references in the audio if left blank.</span>
-                </div>
-
-                <!-- PRIVACY -->
-                <div class="form-group">
-                    <label for="privacy-select">YouTube Privacy</label>
-                    <select id="privacy-select" name="privacy">
-                        <option value="public" selected>Public (Live to all immediately)</option>
-                        <option value="unlisted">Unlisted (Private review link first)</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="alert-error" id="alert-error"></div>
-
-            <button type="button" id="submit-btn" class="submit-btn" onclick="processForm()">
-                <span>🚀 Process &amp; Publish Sermon</span>
-            </button>
-        </form>
-    </div>
-
-    <!-- PROGRESS BOX -->
-    <div class="progress-box" id="progress-box">
-        <div class="progress-title" id="progress-title">Publishing Sermon...</div>
-        <div class="progress-bar-container">
-            <div class="progress-bar-fill" id="progress-bar-fill"></div>
+        <div class="group">
+          <label for="date">Date Preached <span class="badge">Defaults to most recent Sunday</span></label>
+          <input type="date" id="date" name="preached_date" value="{{ default_date }}" required>
         </div>
-        <ul class="steps-list">
-            <li class="step-item" id="step-upload">
-                <div class="step-icon">1</div>
-                <span id="step-upload-text">Uploading audio file to server (0%)</span>
-            </li>
-            <li class="step-item" id="step-ai">
-                <div class="step-icon">2</div>
-                <span>AI analyzing audio, extracting title, &amp; scripture passages</span>
-            </li>
-            <li class="step-item" id="step-video">
-                <div class="step-icon">3</div>
-                <span>Rendering 1080p graphic backdrop &amp; encoding video</span>
-            </li>
-            <li class="step-item" id="step-youtube">
-                <div class="step-icon">4</div>
-                <span>Uploading video &amp; custom thumbnail to YouTube</span>
-            </li>
-            <li class="step-item" id="step-website">
-                <div class="step-icon">5</div>
-                <span>Publishing live to victorychristianfellowship.ca</span>
-            </li>
-        </ul>
-    </div>
 
-    <!-- SUCCESS BOX -->
-    <div class="success-box" id="success-box">
-        <h3 style="color:#065F46; font-size:1.4rem; margin-bottom:8px;">🎉 Sermon Successfully Published!</h3>
-        <p style="color:#047857; font-size:1.1rem; margin-bottom:20px;" id="success-summary"></p>
-        <div class="btn-group">
-            <a href="#" id="yt-link" target="_blank" class="btn-action btn-yt">▶ Watch on YouTube</a>
-            <a href="https://victorychristianfellowship.ca/sermons.html" target="_blank" class="btn-action btn-site">🌐 View on Church Website</a>
+        <div class="group full">
+          <label for="title">Sermon Title <span class="badge ai">Optional - AI detects</span></label>
+          <input type="text" id="title" name="title" maxlength="100" autocomplete="off" placeholder="Leave blank to let AI generate the title">
+          <span class="helper">If the preacher gave you a title, enter it here.</span>
         </div>
-    </div>
-</div>
 
-<footer>
-    Victory Christian Fellowship • 1534 NB-107, Williamsburg, NB E6B 1W9
-</footer>
+        <div class="group full">
+          <label for="scripture">Scripture Passage <span class="badge ai">Optional - AI detects</span></label>
+          <input type="text" id="scripture" name="scripture" maxlength="100" autocomplete="off" placeholder="e.g. Romans 8:1-11">
+          <span class="helper">AI listens for scripture references if left blank.</span>
+        </div>
+
+        <div class="group">
+          <label for="theme">Thumbnail & Video Artwork <span class="badge ai">AI matched</span></label>
+          <select id="theme" name="theme">
+            <option value="AUTO" selected>✨ Automatic (AI matches sermon topic)</option>
+            <option value="WORD_TEACHING">📖 The Word & Scripture (Open Bible in Sunlight)</option>
+            <option value="CROSS_GRACE">✝️ The Cross & Grace (Sunrise on Calvary)</option>
+            <option value="PEACE_SHEPHERD">🐑 The Shepherd & Peace (Psalm 23 Pastures & Still Waters)</option>
+            <option value="FAITH_MOUNTAIN">⛰️ Faith & Strength (Majestic Mountain Dawn)</option>
+            <option value="STORM_DELIVERANCE">🌊 Peace in the Storm (Sea of Galilee)</option>
+            <option value="HOLY_SPIRIT">🕊️ Holy Spirit & Prayer (Sanctuary Divine Light)</option>
+            <option value="LOCAL_FELLOWSHIP">🌲 Local Fellowship (Williamsburg NB Sunset)</option>
+            <option value="CLASSIC_SLATE">🏛️ Classic Slate Navy</option>
+          </select>
+        </div>
+
+        <div class="group">
+          <label for="privacy">YouTube Privacy</label>
+          <select id="privacy" name="privacy">
+            <option value="public" selected>Public (live immediately)</option>
+            <option value="unlisted">Unlisted (review link first)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="alert" id="alert" role="alert"></div>
+      <button type="submit" class="submit" id="submit">🚀 Process &amp; Publish Sermon</button>
+    </form>
+  </div>
+
+  <section class="progress-box" id="progress" aria-live="polite" aria-busy="false">
+    <div class="progress-title" id="progress-title">Publishing Sermon...</div>
+    <div class="status-note" id="status-note"></div>
+    <div class="bar" role="progressbar" aria-label="Publishing progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="bar-wrap"><div id="bar"></div></div>
+    <ul class="steps" id="steps">
+      <li class="step"><i>1</i><span id="upload-text">Uploading audio file</span></li>
+      <li class="step"><i>2</i><span>AI analyzing audio, extracting title &amp; scripture</span></li>
+      <li class="step"><i>3</i><span>Rendering 1080p video</span></li>
+      <li class="step"><i>4</i><span>Uploading video &amp; thumbnail to YouTube</span></li>
+      <li class="step"><i>5</i><span>Publishing to victorychristianfellowship.ca</span></li>
+    </ul>
+  </section>
+
+  <section class="success" id="success" aria-live="polite">
+    <h3 id="success-title">🎉 Sermon Published!</h3>
+    <p id="success-summary"></p>
+    <div class="btns">
+      <a href="#" id="yt-link" target="_blank" rel="noopener noreferrer" class="btn btn-yt" hidden>▶ Watch on YouTube</a>
+      <a href="https://victorychristianfellowship.ca/sermons.html" id="site-link" target="_blank" rel="noopener noreferrer" class="btn btn-site">🌐 View on Church Website</a>
+      <button type="button" class="btn btn-again" id="again">Upload another</button>
+    </div>
+  </section>
+</main>
+
+<footer>Victory Christian Fellowship • 1534 NB-107, Williamsburg, NB E6B 1W9</footer>
 
 <script>
-    var fileInput = document.getElementById('audio-file');
-    var dropzone = document.getElementById('dropzone');
-    var fileSelectedBox = document.getElementById('file-selected-box');
-    var fileNameText = document.getElementById('file-name-text');
-    var fileSizeText = document.getElementById('file-size-text');
-    var alertError = document.getElementById('alert-error');
+(() => {
+  'use strict';
 
-    var preacherSelect = document.getElementById('preacher-select');
-    var customPreacher = document.getElementById('custom-preacher');
-    var submitBtn = document.getElementById('submit-btn');
-    var progressBox = document.getElementById('progress-box');
-    var progressBarFill = document.getElementById('progress-bar-fill');
-    var successBox = document.getElementById('success-box');
+  // Keep these values aligned with the server configuration.
+  const CONFIG = Object.freeze({
+    publishUrl: '/api/publish',
+    statusUrl: jobId => '/api/status/' + encodeURIComponent(jobId),
+    maxFileMB: 500,
+    pollMs: 1500,
+    maxRetryDelayMs: 15000,
+    statusRequestTimeoutMs: 15000,
+    maxProcessingMs: 6 * 60 * 60 * 1000,
+    sessionKey: 'vcf-sermon-publisher-active-job-v1'
+  });
 
-    // On file selected via file browser
-    fileInput.addEventListener('change', function() {
-        if (fileInput.files && fileInput.files.length > 0) {
-            showSelectedFile(fileInput.files[0]);
-        }
+  const $ = id => document.getElementById(id);
+  const el = {
+    form: $('form'), audio: $('audio'), drop: $('dropzone'), box: $('file-box'), alert: $('alert'),
+    preacher: $('preacher'), custom: $('custom-preacher'), date: $('date'), submit: $('submit'),
+    progress: $('progress'), bar: $('bar'), barWrap: $('bar-wrap'), success: $('success'),
+    progressTitle: $('progress-title'), statusNote: $('status-note'), uploadText: $('upload-text'),
+    ytLink: $('yt-link'), siteLink: $('site-link'), again: $('again'), clear: $('clear'),
+    fileName: $('file-name'), fileSize: $('file-size'), successTitle: $('success-title'),
+    successSummary: $('success-summary')
+  };
+  const steps = [...document.querySelectorAll('#steps .step')];
+  const SUBMIT_HTML = el.submit.innerHTML;
+  const STEP_PROGRESS = [0, 0, 40, 55, 72, 88, 100];
+
+  let busy = false;
+  let selectedFile = null;
+
+  function localDateString(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+
+  function mostRecentSunday() {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() - d.getDay());
+    return localDateString(d);
+  }
+
+  function todayLocal() {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    return localDateString(d);
+  }
+
+  function normalizeText(value) {
+    return String(value ?? '').replace(/\s+/g, ' ').trim();
+  }
+
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function fmtMB(bytes) {
+    return (bytes / 1048576).toFixed(1);
+  }
+
+  function resetDateDefaults() {
+    el.date.max = todayLocal();
+    if (!el.date.value) {
+      el.date.value = mostRecentSunday();
+    }
+  }
+
+  function showError(message) {
+    const text = normalizeText(message) || 'An unexpected error occurred.';
+    el.alert.textContent = '❌ ' + text;
+    el.alert.classList.add('active');
+    el.alert.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function clearError() {
+    el.alert.textContent = '';
+    el.alert.classList.remove('active');
+  }
+
+  function setBusy(on, label = null) {
+    busy = on;
+    el.progress.setAttribute('aria-busy', String(on));
+    for (const control of el.form.querySelectorAll('input, select, button')) control.disabled = on;
+    el.drop.classList.toggle('disabled', on);
+    el.submit.innerHTML = on ? (label || '⏳ Processing... please keep this page open') : SUBMIT_HTML;
+  }
+
+  function setBar(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return;
+    const current = parseFloat(el.bar.style.width) || 0;
+    const next = Math.min(100, Math.max(current, parsed, 0));
+    el.bar.style.width = `${next}%`;
+    el.barWrap.setAttribute('aria-valuenow', String(Math.round(next)));
+  }
+
+  // current: 1-5 = current step; 6 = all five steps complete.
+  function setStep(current) {
+    const parsed = Number(current);
+    const safeCurrent = Number.isFinite(parsed) ? Math.min(6, Math.max(1, Math.trunc(parsed))) : 1;
+    steps.forEach((li, index) => {
+      const n = index + 1;
+      li.className = 'step' + (n < safeCurrent ? ' done' : n === safeCurrent ? ' active' : '');
+      li.querySelector('i').textContent = n < safeCurrent ? '✓' : String(n);
     });
+    setBar(STEP_PROGRESS[safeCurrent] ?? 0);
+  }
 
-    // Drag and Drop
-    ['dragenter', 'dragover'].forEach(function(name) {
-        dropzone.addEventListener(name, function(e) {
-            e.preventDefault();
-            dropzone.style.background = '#FFF7ED';
-            dropzone.style.borderColor = '#EA642A';
-        });
+  function setStatusNote(message = '') {
+    el.statusNote.textContent = normalizeText(message);
+  }
+
+  function saveActiveJob(jobId) {
+    const state = {
+      jobId: String(jobId),
+      startedAt: Date.now()
+    };
+    try { sessionStorage.setItem(CONFIG.sessionKey, JSON.stringify(state)); } catch {}
+  }
+
+  function loadActiveJob() {
+    try {
+      const raw = sessionStorage.getItem(CONFIG.sessionKey);
+      if (!raw) return null;
+      const state = JSON.parse(raw);
+      if (!state || typeof state.jobId !== 'string' || !state.jobId.trim()) return null;
+      return state;
+    } catch {
+      return null;
+    }
+  }
+
+  function clearActiveJob() {
+    try { sessionStorage.removeItem(CONFIG.sessionKey); } catch {}
+  }
+
+  function validateFile(file) {
+    if (!(file instanceof File)) return 'Please choose an audio file first.';
+    if (file.size <= 0) return 'That audio file is empty. Please choose a valid recording.';
+    if (file.size > CONFIG.maxFileMB * 1048576) return `File is ${fmtMB(file.size)} MB; the limit is ${CONFIG.maxFileMB} MB.`;
+    const extensionOkay = /\.(mp3|wav|m4a|aac|flac|ogg|wma)$/i.test(file.name || '');
+    const mimeOkay = typeof file.type === 'string' && file.type.toLowerCase().startsWith('audio/');
+    if (!extensionOkay && !mimeOkay) return 'That does not look like a supported audio file. Please choose MP3, M4A, WAV, AAC, FLAC, OGG, or WMA.';
+    return null;
+  }
+
+  function selectFile(file, { fromInput = false } = {}) {
+    clearError();
+    const error = validateFile(file);
+    if (error) {
+      clearFile();
+      showError(error);
+      return false;
+    }
+
+    selectedFile = file;
+    el.fileName.textContent = '✅ ' + (file.name || 'Selected audio file');
+    el.fileSize.textContent = `${fmtMB(file.size)} MB • Ready to process & publish`;
+    el.box.classList.add('active');
+
+    // A dropped file is held directly in selectedFile. We intentionally do not
+    // assign input.files because that operation is unreliable in some browsers.
+    if (!fromInput) el.audio.value = '';
+    return true;
+  }
+
+  function clearFile() {
+    selectedFile = null;
+    el.audio.value = '';
+    el.fileName.textContent = '';
+    el.fileSize.textContent = '';
+    el.box.classList.remove('active');
+  }
+
+  function resetOutcome() {
+    el.success.classList.remove('active', 'warning');
+    el.ytLink.hidden = true;
+    el.ytLink.removeAttribute('href');
+    el.siteLink.hidden = false;
+    el.successTitle.textContent = '🎉 Sermon Published!';
+    el.successSummary.textContent = '';
+  }
+
+  function resetProgress() {
+    el.bar.style.width = '0%';
+    el.barWrap.setAttribute('aria-valuenow', '0');
+    el.progressTitle.textContent = 'Publishing Sermon...';
+    el.uploadText.textContent = 'Uploading audio file';
+    setStatusNote('');
+    setStep(1);
+  }
+
+  function safeYouTubeUrl(value) {
+    if (typeof value !== 'string' || !value.trim()) return null;
+    try {
+      const url = new URL(value);
+      if (url.protocol !== 'https:') return null;
+      const host = url.hostname.toLowerCase().replace(/^www\./, '');
+      if (host !== 'youtube.com' && host !== 'youtu.be') return null;
+      return url.href;
+    } catch {
+      return null;
+    }
+  }
+
+  function createFormData(file) {
+    const preacher = el.preacher.value === 'Guest Speaker'
+      ? normalizeText(el.custom.value)
+      : normalizeText(el.preacher.value);
+
+    const fd = new FormData();
+    fd.append('audio', file, file.name);
+    fd.append('preacher', preacher);
+    fd.append('preached_date', el.date.value);
+    fd.append('title', normalizeText($('title').value));
+    fd.append('scripture', normalizeText($('scripture').value));
+    fd.append('privacy', $('privacy').value);
+    fd.append('theme', $('theme').value);
+
+    // Client-side idempotency key to prevent accidental duplicate processing
+    const rawKey = `${file.name}_${file.size}_${file.lastModified || 0}_${el.date.value}_${preacher}_${$('theme').value}`;
+    fd.append('idempotency_key', rawKey);
+    return fd;
+  }
+
+  function validateForm() {
+    const fileError = validateFile(selectedFile);
+    if (fileError) return fileError;
+    if (!el.date.value) return 'Please pick the date this sermon was preached.';
+    if (el.date.value > todayLocal()) return 'The preached date cannot be in the future.';
+    if (el.preacher.value === 'Guest Speaker' && !normalizeText(el.custom.value)) {
+      el.custom.focus();
+      return 'Please enter the guest preacher\'s name.';
+    }
+    return null;
+  }
+
+  // XHR is used because it supports upload progress events.
+  function upload(formData) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', CONFIG.publishUrl, true);
+      xhr.responseType = 'text';
+      xhr.timeout = 30 * 60 * 1000;
+      xhr.setRequestHeader('Accept', 'application/json');
+
+      xhr.upload.onprogress = event => {
+        if (!event.lengthComputable) return;
+        const pct = Math.min(100, Math.max(0, Math.round(event.loaded / event.total * 100)));
+        el.uploadText.textContent = `Uploading audio file (${pct}%)`;
+        setBar(pct * 0.4);
+      };
+
+      xhr.onload = () => {
+        let data = null;
+        try { data = JSON.parse(xhr.responseText || '{}'); } catch {}
+        const okay = xhr.status >= 200 && xhr.status < 300;
+        if (okay && data && typeof data.job_id !== 'undefined' && String(data.job_id).trim()) {
+          resolve(String(data.job_id));
+          return;
+        }
+        const detail = data && typeof data.error === 'string' ? data.error : '';
+        reject(new Error(detail || `The server rejected the upload (${xhr.status || 'no status'}${xhr.statusText ? ` ${xhr.statusText}` : ''}).`));
+      };
+
+      xhr.onerror = () => reject(Object.assign(new Error('The connection was lost before the server confirmed the upload. To avoid publishing the same sermon twice, check YouTube before submitting it again.'), { ambiguousUpload: true }));
+      xhr.ontimeout = () => reject(Object.assign(new Error('The upload timed out before the server confirmed it. To avoid a duplicate, check YouTube before submitting it again.'), { ambiguousUpload: true }));
+      xhr.onabort = () => reject(new Error('The upload was cancelled.'));
+      xhr.send(formData);
     });
+  }
 
-    ['dragleave', 'drop'].forEach(function(name) {
-        dropzone.addEventListener(name, function(e) {
-            e.preventDefault();
-            dropzone.style.background = '#F8FAFC';
-            dropzone.style.borderColor = '#EA642A';
-        });
+  async function fetchJob(jobId) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), CONFIG.statusRequestTimeoutMs);
+    try {
+      const response = await fetch(CONFIG.statusUrl(jobId), {
+        method: 'GET',
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+        signal: controller.signal
+      });
+
+      if (response.status === 404) {
+        throw Object.assign(new Error('The server does not currently recognize this job.'), { notFound: true });
+      }
+      if (response.status === 401 || response.status === 403) {
+        throw Object.assign(new Error('Your session is no longer authorized. Reload or sign in again; this job will remain available to resume in this tab.'), { fatal: true, keepJob: true });
+      }
+      if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) {
+        throw Object.assign(new Error(`The server rejected the status check (${response.status}). Check YouTube and the church website before submitting again.`), { fatal: true });
+      }
+      if (!response.ok) throw new Error(`Status check failed (${response.status}).`);
+
+      let job;
+      try { job = await response.json(); }
+      catch { throw new Error('The server returned an invalid status response.'); }
+      if (!job || typeof job !== 'object') throw new Error('The server returned an empty status response.');
+      return job;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async function poll(jobId, startedAt = Date.now()) {
+    let failures = 0;
+    let delay = CONFIG.pollMs;
+
+    for (;;) {
+      if (Date.now() - startedAt > CONFIG.maxProcessingMs) {
+        throw Object.assign(new Error('Processing has exceeded six hours. The job may still be running on the server; check YouTube and the church website before submitting it again.'), { keepJob: true });
+      }
+
+      if (delay) await sleep(delay);
+
+      let job;
+      try {
+        job = await fetchJob(jobId);
+        failures = 0;
+        delay = CONFIG.pollMs;
+        setStatusNote('');
+      } catch (error) {
+        if (error.notFound && Date.now() - startedAt >= 15000) {
+          throw Object.assign(new Error('The server no longer has this job. It may have restarted. Check YouTube and the church website before trying again.'), { fatal: true });
+        }
+        if (error.fatal) throw error;
+        failures += 1;
+        delay = Math.min(CONFIG.maxRetryDelayMs, CONFIG.pollMs * Math.pow(2, Math.min(failures - 1, 4)));
+        setStatusNote(error.notFound
+          ? `Waiting for the server to register the job. Checking again in ${Math.ceil(delay / 1000)} seconds…`
+          : `Connection issue. Retrying automatically in ${Math.ceil(delay / 1000)} seconds…`);
+        continue;
+      }
+
+      const message = typeof job.message === 'string' ? normalizeText(job.message) : '';
+      if (message) el.progressTitle.textContent = message;
+
+      const status = String(job.status || '').toLowerCase();
+      if (status === 'completed') return job.result && typeof job.result === 'object' ? job.result : {};
+      if (status === 'error' || status === 'failed') {
+        const detail = typeof job.error === 'string' ? normalizeText(job.error) : '';
+        throw Object.assign(new Error(detail || 'The server reported an error while processing this sermon.'), { serverFailed: true });
+      }
+
+      if (job.progress !== null && typeof job.progress !== 'undefined' && job.progress !== '') {
+        const progress = Number(job.progress);
+        if (Number.isFinite(progress)) setBar(progress);
+      }
+
+      if (job.step !== null && typeof job.step !== 'undefined' && job.step !== '') {
+        const step = Number(job.step);
+        if (Number.isFinite(step)) setStep(step);
+      }
+    }
+  }
+
+  function showResult(result) {
+    clearActiveJob();
+    resetOutcome();
+
+    if (result.quota_notice) {
+      setStep(4);
+      setBar(75);
+      el.progressTitle.textContent = 'Video rendered; YouTube publishing is paused';
+      el.success.classList.add('warning');
+      el.successTitle.textContent = '⚠️ Video rendered, but not fully published';
+      el.successSummary.textContent = normalizeText(result.quota_message) || 'The video rendered successfully, but YouTube publishing could not finish. Review the publishing status before trying again.';
+      el.ytLink.hidden = true;
+      el.siteLink.hidden = true;
+    } else {
+      setStep(6);
+      setBar(100);
+      el.progressTitle.textContent = '🎉 Publishing Complete!';
+      el.successTitle.textContent = '🎉 Sermon Published!';
+
+      const title = normalizeText(result.title) || 'The sermon';
+      const preacher = normalizeText(result.preacher);
+      el.successSummary.textContent = preacher
+        ? `“${title}” by ${preacher} has finished publishing.`
+        : `“${title}” has finished publishing.`;
+
+      const youtubeUrl = safeYouTubeUrl(result.youtube_url);
+      if (youtubeUrl) {
+        el.ytLink.href = youtubeUrl;
+        el.ytLink.hidden = false;
+      }
+    }
+
+    el.success.classList.add('active');
+    el.success.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  async function monitorJob(jobId, startedAt) {
+    setBusy(true, '⏳ Processing... please keep this page open');
+    resetOutcome();
+    el.progress.classList.add('active');
+    el.progressTitle.textContent = 'Resuming sermon publishing...';
+    setStatusNote('Checking the server for the current job status…');
+    setStep(2);
+
+    try {
+      const result = await poll(jobId, Number(startedAt) || Date.now());
+      showResult(result);
+      clearFile();
+    } catch (error) {
+      el.progress.classList.remove('active');
+      if (!error.keepJob) clearActiveJob();
+      showError(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  el.audio.addEventListener('change', () => {
+    const file = el.audio.files?.[0] || null;
+    if (file) selectFile(file, { fromInput: true });
+  });
+
+  el.clear.addEventListener('click', clearFile);
+
+  // Prevent the browser from opening a dropped file as a new page.
+  for (const eventName of ['dragover', 'drop']) {
+    window.addEventListener(eventName, event => event.preventDefault());
+  }
+
+  for (const eventName of ['dragenter', 'dragover']) {
+    el.drop.addEventListener(eventName, event => {
+      if (busy) return;
+      event.preventDefault();
+      el.drop.classList.add('drag');
     });
+  }
 
-    dropzone.addEventListener('drop', function(e) {
-        if (e.dataTransfer && e.dataTransfer.files.length > 0) {
-            fileInput.files = e.dataTransfer.files;
-            showSelectedFile(e.dataTransfer.files[0]);
-        }
-    });
+  for (const eventName of ['dragleave', 'drop']) {
+    el.drop.addEventListener(eventName, () => el.drop.classList.remove('drag'));
+  }
 
-    function showSelectedFile(file) {
-        alertError.classList.remove('active');
-        fileNameText.textContent = '✅ ' + file.name;
-        var sizeMb = (file.size / (1024 * 1024)).toFixed(1);
-        fileSizeText.textContent = sizeMb + ' MB • Ready to process & publish';
-        fileSelectedBox.classList.add('active');
+  el.drop.addEventListener('drop', event => {
+    event.preventDefault();
+    if (busy) return;
+    const files = event.dataTransfer?.files;
+    if (!files?.length) return;
+    if (files.length > 1) {
+      showError('Please drop one audio file at a time.');
+      return;
+    }
+    selectFile(files[0]);
+  });
+
+  el.preacher.addEventListener('change', () => {
+    const guest = el.preacher.value === 'Guest Speaker';
+    el.custom.hidden = !guest;
+    if (!guest) el.custom.value = '';
+    if (guest) el.custom.focus();
+  });
+
+  el.form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (busy) return;
+    clearError();
+
+    const validationError = validateForm();
+    if (validationError) {
+      showError(validationError);
+      return;
     }
 
-    function clearSelectedFile() {
-        fileInput.value = '';
-        fileSelectedBox.classList.remove('active');
+    const formData = createFormData(selectedFile);
+    setBusy(true);
+    resetOutcome();
+    resetProgress();
+    el.uploadText.textContent = 'Uploading audio file (0%)';
+    el.progress.classList.add('active');
+    el.progress.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    try {
+      const jobId = await upload(formData);
+      saveActiveJob(jobId);
+      setStep(2);
+      setBar(40);
+      el.uploadText.textContent = 'Audio upload complete';
+      showResult(await poll(jobId));
+      clearFile();
+    } catch (error) {
+      el.progress.classList.remove('active');
+      if (!error.keepJob) clearActiveJob();
+      showError(error.message);
+    } finally {
+      setBusy(false);
     }
+  });
 
-    function handlePreacherChange() {
-        if (preacherSelect.value === 'Guest Speaker') {
-            customPreacher.style.display = 'block';
-            customPreacher.focus();
-        } else {
-            customPreacher.style.display = 'none';
-        }
-    }
+  el.again.addEventListener('click', () => {
+    clearActiveJob();
+    resetOutcome();
+    el.progress.classList.remove('active');
+    el.form.reset();
+    clearFile();
+    resetDateDefaults();
+    el.custom.hidden = true;
+    clearError();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
 
-    function processForm() {
-        alertError.classList.remove('active');
+  window.addEventListener('beforeunload', event => {
+    if (!busy) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
 
-        // Validation
-        if (!fileInput.files || fileInput.files.length === 0) {
-            alertError.textContent = '⚠️ Please select an audio file first using the file chooser above!';
-            alertError.classList.add('active');
-            alertError.scrollIntoView({ behavior: 'smooth' });
-            return;
-        }
+  resetDateDefaults();
+  resetProgress();
+  resetOutcome();
 
-        var file = fileInput.files[0];
-        var preacher = preacherSelect.value;
-        if (preacher === 'Guest Speaker') {
-            preacher = customPreacher.value.trim() || 'Guest Speaker';
-        }
+  async function checkHealth() {
+    try {
+      const res = await fetch('/api/health');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.youtube_auth === false) {
+        showError('⚠️ YouTube authorization has expired (Google 7-day test limit). Please double-click "reauth.bat" in the app folder to refresh credentials.');
+      }
+    } catch {}
+  }
+  checkHealth();
 
-        var preachedDate = document.getElementById('preached-date').value;
-        var title = document.getElementById('sermon-title').value.trim();
-        var scripture = document.getElementById('scripture-ref').value.trim();
-        var privacy = document.getElementById('privacy-select').value;
-
-        // UI state
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span>⏳ Processing in progress... Please wait</span>';
-        progressBox.classList.add('active');
-        successBox.classList.remove('active');
-        progressBox.scrollIntoView({ behavior: 'smooth' });
-
-        setStep('step-upload', 'active');
-
-        // Build FormData
-        var formData = new FormData();
-        formData.append('audio', file);
-        formData.append('preacher', preacher);
-        formData.append('preached_date', preachedDate);
-        formData.append('title', title);
-        formData.append('scripture', scripture);
-        formData.append('privacy', privacy);
-
-        // Upload with real-time percentage
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/publish', true);
-
-        xhr.upload.onprogress = function(e) {
-            if (e.lengthComputable) {
-                var percent = Math.round((e.loaded / e.total) * 100);
-                progressBarFill.style.width = (percent * 0.4) + '%';
-                document.getElementById('step-upload-text').textContent = 'Uploading audio file (' + percent + '%)';
-                if (percent === 100) {
-                    setStep('step-upload', 'done');
-                    setStep('step-ai', 'active');
-                    progressBarFill.style.width = '55%';
-                }
-            }
-        };
-
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                try {
-                    var data = JSON.parse(xhr.responseText);
-                    if (data.success && data.job_id) {
-                        setStep('step-upload', 'done');
-                        setStep('step-ai', 'active');
-                        pollJobStatus(data.job_id);
-                        return;
-                    } else {
-                        showError(data.error || 'Upload error');
-                    }
-                } catch (err) {
-                    showError('Error parsing response: ' + err.message);
-                }
-            } else {
-                var err = xhr.statusText;
-                try {
-                    var d = JSON.parse(xhr.responseText);
-                    if (d.error) err = d.error;
-                } catch(e) {}
-                showError('Server error (' + xhr.status + '): ' + err);
-            }
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<span>🚀 Process &amp; Publish Sermon</span>';
-        };
-
-        xhr.onerror = function() {
-            showError('Network connection error. Please try again.');
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<span>🚀 Process &amp; Publish Sermon</span>';
-        };
-
-        xhr.send(formData);
-    }
-
-    function pollJobStatus(jobId) {
-        var pollTimer = setInterval(function() {
-            var req = new XMLHttpRequest();
-            req.open('GET', '/api/status/' + jobId, true);
-            req.onload = function() {
-                if (req.status === 200) {
-                    try {
-                        var job = JSON.parse(req.responseText);
-                        if (job.message) {
-                            document.getElementById('progress-title').textContent = job.message;
-                        }
-                        if (job.progress) {
-                            progressBarFill.style.width = job.progress + '%';
-                        }
-                        if (job.step >= 2) {
-                            setStep('step-upload', 'done');
-                            setStep('step-ai', job.step === 2 ? 'active' : 'done');
-                        }
-                        if (job.step >= 3) {
-                            setStep('step-ai', 'done');
-                            setStep('step-video', job.step === 3 ? 'active' : 'done');
-                        }
-                        if (job.step >= 4) {
-                            setStep('step-video', 'done');
-                            setStep('step-youtube', job.step === 4 ? 'active' : 'done');
-                        }
-                        if (job.step >= 5) {
-                            setStep('step-youtube', 'done');
-                            setStep('step-website', job.step === 5 ? 'active' : 'done');
-                        }
-
-                        if (job.status === 'completed') {
-                            clearInterval(pollTimer);
-                            setStep('step-upload', 'done');
-                            setStep('step-ai', 'done');
-                            setStep('step-video', 'done');
-                            setStep('step-youtube', 'done');
-                            setStep('step-website', 'done');
-                            progressBarFill.style.width = '100%';
-
-                            var res = job.result || {};
-                            if (res.quota_notice) {
-                                document.getElementById('progress-title').textContent = '✅ Video Rendered Successfully!';
-                                document.getElementById('success-summary').textContent = res.quota_message;
-                                document.getElementById('yt-link').style.display = 'none';
-                            } else {
-                                document.getElementById('progress-title').textContent = '🎉 Publishing Complete!';
-                                document.getElementById('success-summary').textContent = '"' + res.title + '" by ' + res.preacher + ' is now live on YouTube and victorychristianfellowship.ca!';
-                                document.getElementById('yt-link').href = res.youtube_url;
-                                document.getElementById('yt-link').style.display = 'inline-flex';
-                            }
-                            successBox.classList.add('active');
-                            successBox.scrollIntoView({ behavior: 'smooth' });
-                            submitBtn.disabled = false;
-                            submitBtn.innerHTML = '<span>🚀 Process &amp; Publish Sermon</span>';
-                        } else if (job.status === 'error') {
-                            clearInterval(pollTimer);
-                            showError(job.error || 'An error occurred during processing.');
-                            submitBtn.disabled = false;
-                            submitBtn.innerHTML = '<span>🚀 Process &amp; Publish Sermon</span>';
-                        }
-                    } catch(e) {}
-                }
-            };
-            req.onerror = function() {
-                // Transient connection hiccup, keep polling
-            };
-            req.send();
-        }, 1500);
-    }
-
-    function showError(msg) {
-        alertError.textContent = '❌ ' + msg;
-        alertError.classList.add('active');
-        alertError.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    function setStep(id, status) {
-        var el = document.getElementById(id);
-        if (!el) return;
-        el.className = 'step-item ' + status;
-        if (status === 'done') {
-            el.querySelector('.step-icon').textContent = '✓';
-        }
-    }
+  // Recover an already-created job after an accidental refresh. This cannot
+  // recover an upload interrupted before the server returned a job_id.
+  const savedJob = loadActiveJob();
+  if (savedJob) monitorJob(savedJob.jobId, savedJob.startedAt);
+})();
 </script>
-
 </body>
 </html>

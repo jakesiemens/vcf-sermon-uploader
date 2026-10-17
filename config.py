@@ -4,6 +4,19 @@ import shutil
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# Load local .env if present
+env_file = os.path.join(BASE_DIR, ".env")
+if os.path.exists(env_file):
+    try:
+        with open(env_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    os.environ.setdefault(k.strip(), v.strip())
+    except Exception as e:
+        print(f"Notice: Could not load .env: {e}")
+
 # Unpack environment secrets if provided in cloud
 if os.environ.get("YOUTUBE_TOKEN_JSON"):
     with open(os.path.join(BASE_DIR, "token.json"), "w", encoding="utf-8") as f:
@@ -34,7 +47,7 @@ ARCHIVE_JSON = os.path.join(WEBSITE_DIR, "sermons_youtube_archive_clean.json")
 GITHUB_REPO = os.environ.get("GITHUB_REPO", "jakesiemens/vcf-site")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 
-# Gemini AI Key for YouTube 1-paragraph description summaries
+# Gemini AI Key for YouTube analysis, timestamps, and description summaries
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 OFFICIAL_PLAYLIST_ID = os.environ.get("OFFICIAL_PLAYLIST_ID", "PLGQORcmRVjX0")
 

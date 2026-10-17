@@ -4,5 +4,13 @@ output/*
 !output/.gitkeep
 __pycache__/
 *.pyc
+*/__pycache__/*
 active_mobile_link.txt
 *.vbs
+*.mp3
+*.wav
+sermon_analysis_result.json
+.env
+token.json
+client_secret*.json
+

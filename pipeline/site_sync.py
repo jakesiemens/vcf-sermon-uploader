@@ -54,6 +54,8 @@ def sync_new_sermon_to_website(video_id, title, preacher, preached_date_iso, dis
 
         git_pushed = False
         try:
+            # Rebase latest remote commits to prevent non-fast-forward push rejection
+            subprocess.run(["git", "pull", "--rebase", "origin", "main"], cwd=WEBSITE_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             subprocess.run(["git", "add", "sermons_youtube_archive_clean.json"], cwd=WEBSITE_DIR, check=True)
             subprocess.run(["git", "commit", "-m", f"Add new sermon: {title}"], cwd=WEBSITE_DIR, check=True)
             subprocess.run(["git", "push", "origin", "main"], cwd=WEBSITE_DIR, check=True)

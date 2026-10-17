@@ -43,59 +43,158 @@ def get_font(size, bold=False):
 
     return ImageFont.load_default()
 
-def render_sermon_backdrop(title, preacher, date_str, out_image_path):
-    """Generates 1920x1080 graphic card for video and YouTube thumbnail"""
+BACKDROPS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "backdrops")
+
+THEME_BACKDROPS = {
+    "WORD_TEACHING": "bible_sunlight.jpg",
+    "BIBLE_SUNLIGHT": "bible_sunlight.jpg",
+    "CROSS_GRACE": "cross_grace.jpg",
+    "FAITH_MOUNTAIN": "faith_mountain.jpg",
+    "PEACE_SHEPHERD": "peace_shepherd.jpg",
+    "STORM_DELIVERANCE": "storm_deliverance.jpg",
+    "HOLY_SPIRIT": "holy_spirit.jpg",
+    "LOCAL_FELLOWSHIP": "local_williamsburg.jpg",
+    "CLASSIC_SLATE": None
+}
+
+def resolve_backdrop_image(visual_theme=None, custom_bg_path=None):
+    """Resolves background image path from custom upload, theme name, or fallback"""
+    if custom_bg_path and os.path.exists(custom_bg_path):
+        return custom_bg_path
+
+    theme_key = (visual_theme or "WORD_TEACHING").strip().upper()
+    filename = THEME_BACKDROPS.get(theme_key, "bible_sunlight.jpg")
+    if filename:
+        p = os.path.join(BACKDROPS_DIR, filename)
+        if os.path.exists(p):
+            return p
+
+    # Fallback to bible_sunlight or local river
+    for fb in ["bible_sunlight.jpg", "cross_grace.jpg", "sermon_backdrop_clean.jpg"]:
+        p = os.path.join(BACKDROPS_DIR, fb)
+        if os.path.exists(p):
+            return p
+        p_static = os.path.join(os.path.dirname(BACKDROPS_DIR), fb)
+        if os.path.exists(p_static):
+            return p_static
+
+    return None
+
+def render_sermon_backdrop(title, preacher, date_str, out_image_path, scripture="", visual_theme="WORD_TEACHING", custom_bg_path=None, subtitle=""):
+    """Generates rich 1920x1080 cinematic card for video playback and YouTube thumbnail in the exact style of modern high-impact sermon graphics"""
     w, h = 1920, 1080
-    img = Image.new("RGB", (w, h), BG_COLOR)
+    bg_file = resolve_backdrop_image(visual_theme, custom_bg_path)
+
+    if bg_file and os.path.exists(bg_file):
+        try:
+            img = Image.open(bg_file).convert("RGB")
+            if img.size != (w, h):
+                img = img.resize((w, h), Image.Resampling.LANCZOS)
+        except Exception as e:
+            print(f"Notice: Failed to load background {bg_file}: {e}. Using classic solid navy.")
+            img = Image.new("RGB", (w, h), BG_COLOR)
+    else:
+        img = Image.new("RGB", (w, h), BG_COLOR)
+
+    # 1. Subtle dark vignette / scrim so top and bottom text pop with 100% contrast
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    o_draw = ImageDraw.Draw(overlay)
+    for y in range(h):
+        alpha = 0
+        if y < 520:
+            # Darker at top for title
+            alpha = int(145 * (1.0 - (y / 520.0) ** 1.3))
+        elif y > 750:
+            # Darker at bottom for speaker and scripture banner
+            alpha = int(165 * (((y - 750) / 330.0) ** 1.1))
+        if alpha > 0:
+            o_draw.line([(0, y), (w, y)], fill=(12, 16, 24, alpha))
+            
+    img.paste(overlay, (0, 0), mask=overlay)
     draw = ImageDraw.Draw(img)
 
-    # Accent top and bottom borders
-    draw.rectangle([(0, 0), (w, 8)], fill=ORANGE_BAR)
-    draw.rectangle([(0, h - 8), (w, h)], fill=ORANGE_BAR)
+    # Font definitions
+    clean_title = (title or "Sunday Morning Message").strip()
+    words = clean_title.split()
+    if len(words) <= 3:
+        lines = [" ".join(words)]
+    elif len(words) <= 6:
+        mid = len(words) // 2
+        lines = [" ".join(words[:mid]), " ".join(words[mid:])]
+    else:
+        lines = textwrap.wrap(clean_title.upper(), width=28)
 
-    # Logo
-    if os.path.exists(LOGO_PATH):
-        try:
-            logo = Image.open(LOGO_PATH).convert("RGBA")
-            logo_w = 420
-            logo_h = int(logo.size[1] * (logo_w / logo.size[0]))
-            logo = logo.resize((logo_w, logo_h), Image.Resampling.LANCZOS)
-            img.paste(logo, ((w - logo_w) // 2, 140), mask=logo)
-        except Exception as e:
-            print(f"Logo error: {e}")
+    title_size = 84 if len(lines) <= 2 else 68
+    title_font = get_font(title_size, bold=True)
+    sub_font = get_font(42, bold=False)
+    sans_font = get_font(36, bold=False)
+    sans_bold_font = get_font(28, bold=True)
 
-    # Orange divider line
-    line_y = 350
-    line_w = 260
-    draw.rectangle([((w - line_w) // 2, line_y), ((w + line_w) // 2, line_y + 4)], fill=ORANGE_BAR)
+    # 2. Render Title Lines in Upper Half
+    start_y = 120 if len(lines) > 2 else 150
+    curr_y = start_y
 
-    # Title
-    font_size = 56 if len(title) > 40 else 66
-    title_font = get_font(font_size, bold=True)
-    wrap_width = 30 if font_size == 66 else 38
-    title_lines = textwrap.wrap(title.upper(), width=wrap_width)
+    for idx, line in enumerate(lines):
+        line_upper = line.upper()
+        bbox = draw.textbbox((0, 0), line_upper, font=title_font)
+        lw = bbox[2] - bbox[0]
+        lx = (w - lw) // 2
 
-    total_title_h = len(title_lines) * (font_size + 16)
-    title_start_y = 440 + (120 - total_title_h) // 2
-    curr_y = title_start_y
+        # Color: Top line(s) ivory white, bottom line warm radiant gold!
+        if idx == len(lines) - 1 and len(lines) > 1:
+            txt_color = (245, 197, 100) # Radiant warm gold
+        else:
+            txt_color = (252, 248, 242) # Pure ivory white
 
-    for line in title_lines:
-        bbox = draw.textbbox((0, 0), line, font=title_font)
-        text_w = bbox[2] - bbox[0]
-        draw.text(((w - text_w) // 2, curr_y), line, fill=TITLE_COLOR, font=title_font)
-        curr_y += font_size + 16
+        # Soft drop shadow for crisp 3D embossed effect
+        for offset in [(0, 3), (2, 2), (-2, 2), (0, 4)]:
+            draw.text((lx + offset[0], curr_y + offset[1]), line_upper, fill=(0, 0, 0, 220), font=title_font)
+        draw.text((lx, curr_y), line_upper, fill=txt_color, font=title_font)
+        curr_y += title_size + 16
 
-    # Preacher
-    preacher_font = get_font(42, bold=True)
-    preacher_text = f"Preacher: {preacher}" if preacher else "Victory Christian Fellowship"
-    p_bbox = draw.textbbox((0, 0), preacher_text, font=preacher_font)
-    draw.text(((w - (p_bbox[2] - p_bbox[0])) // 2, 770), preacher_text, fill=PREACHER_COLOR, font=preacher_font)
+    # 3. Subtitle (if provided)
+    clean_subtitle = (subtitle or "").strip()
+    if clean_subtitle:
+        s_bbox = draw.textbbox((0, 0), clean_subtitle, font=sub_font)
+        sw = s_bbox[2] - s_bbox[0]
+        sx = (w - sw) // 2
+        draw.text((sx + 1, curr_y + 2), clean_subtitle, fill=(0, 0, 0, 200), font=sub_font)
+        draw.text((sx, curr_y), clean_subtitle, fill=(238, 232, 222), font=sub_font)
 
-    # Date
-    date_font = get_font(34, bold=False)
-    d_bbox = draw.textbbox((0, 0), date_str, font=date_font)
-    draw.text(((w - (d_bbox[2] - d_bbox[0])) // 2, 850), date_str, fill=DATE_COLOR, font=date_font)
+    # 4. Speaker in Lower Third
+    speaker_text = f"Speaker: {preacher}" if preacher else "Victory Christian Fellowship"
+    p_bbox = draw.textbbox((0, 0), speaker_text, font=sans_font)
+    pw = p_bbox[2] - p_bbox[0]
+    px = (w - pw) // 2
+    py = 835
+    draw.text((px + 1, py + 2), speaker_text, fill=(0, 0, 0, 220), font=sans_font)
+    draw.text((px, py), speaker_text, fill=(240, 240, 245), font=sans_font)
 
+    # Subtle Warm Accent Line under Speaker
+    line_w = min(pw + 60, 360)
+    line_y = py + 52
+    draw.line([((w - line_w) // 2, line_y), ((w + line_w) // 2, line_y)], fill=(234, 160, 60, 200), width=2)
+
+    # 5. Scripture & Date Line (Spaced Upper Caps)
+    ref_parts = []
+    if scripture and scripture.strip():
+        ref_parts.append(scripture.strip().upper())
+    if date_str and date_str.strip():
+        ref_parts.append(date_str.strip().upper())
+    ref_text = "   •   ".join(ref_parts) if ref_parts else "VICTORY CHRISTIAN FELLOWSHIP"
+
+    r_bbox = draw.textbbox((0, 0), ref_text, font=sans_bold_font)
+    rw = r_bbox[2] - r_bbox[0]
+    rx = (w - rw) // 2
+    ry = line_y + 18
+    draw.text((rx + 1, ry + 2), ref_text, fill=(0, 0, 0, 220), font=sans_bold_font)
+    draw.text((rx, ry), ref_text, fill=(215, 222, 230), font=sans_bold_font)
+
+    os.makedirs(os.path.dirname(out_image_path), exist_ok=True)
+    img.save(out_image_path, "JPEG", quality=95)
+    return out_image_path
+
+    os.makedirs(os.path.dirname(out_image_path), exist_ok=True)
     img.save(out_image_path, "JPEG", quality=95)
     return out_image_path
 
@@ -150,7 +249,7 @@ def build_video_from_audio(audio_path, image_path, output_mp4_path, progress_cal
         "-preset", "ultrafast",
         "-crf", "32",
         "-r", "1",
-        "-g", "1",
+        "-g", "60",
         "-pix_fmt", "yuv420p"
     ])
 
