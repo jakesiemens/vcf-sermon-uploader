@@ -13,4 +13,6 @@ sermon_analysis_result.json
 .env
 token.json
 client_secret*.json
+*.txt
+!requirements.txt
 

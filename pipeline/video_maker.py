@@ -53,7 +53,7 @@ THEME_BACKDROPS = {
     "PEACE_SHEPHERD": "peace_shepherd.jpg",
     "STORM_DELIVERANCE": "storm_deliverance.jpg",
     "HOLY_SPIRIT": "holy_spirit.jpg",
-    "LOCAL_FELLOWSHIP": "local_williamsburg.jpg",
+    "LOCAL_FELLOWSHIP": "holy_spirit.jpg",
     "CLASSIC_SLATE": None
 }
 
@@ -69,8 +69,8 @@ def resolve_backdrop_image(visual_theme=None, custom_bg_path=None):
         if os.path.exists(p):
             return p
 
-    # Fallback to bible_sunlight or local river
-    for fb in ["bible_sunlight.jpg", "cross_grace.jpg", "sermon_backdrop_clean.jpg"]:
+    # Fallback to curated cinematic backdrops (never casual phone photos)
+    for fb in ["bible_sunlight.jpg", "cross_grace.jpg", "faith_mountain.jpg"]:
         p = os.path.join(BACKDROPS_DIR, fb)
         if os.path.exists(p):
             return p
@@ -190,11 +190,9 @@ def render_sermon_backdrop(title, preacher, date_str, out_image_path, scripture=
     draw.text((rx + 1, ry + 2), ref_text, fill=(0, 0, 0, 220), font=sans_bold_font)
     draw.text((rx, ry), ref_text, fill=(215, 222, 230), font=sans_bold_font)
 
-    os.makedirs(os.path.dirname(out_image_path), exist_ok=True)
-    img.save(out_image_path, "JPEG", quality=95)
-    return out_image_path
-
-    os.makedirs(os.path.dirname(out_image_path), exist_ok=True)
+    dir_name = os.path.dirname(out_image_path)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
     img.save(out_image_path, "JPEG", quality=95)
     return out_image_path
 

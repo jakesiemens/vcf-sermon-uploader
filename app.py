@@ -18,6 +18,7 @@ from pipeline.audio_analyzer import (
     detect_scripture, generate_smart_title, analyze_transcript_with_gemini,
     analyze_sermon_audio_multimodal
 )
+from pipeline.image_generator import generate_sermon_artwork
 from pipeline.video_maker import render_sermon_backdrop, build_video_from_audio
 from pipeline.youtube_uploader import upload_sermon_to_youtube
 from pipeline.site_sync import sync_new_sermon_to_website
@@ -215,22 +216,24 @@ def process_sermon_worker(job_id, audio_path, filename, custom_title, custom_scr
             step=3,
             step_name='video',
             progress=55,
-            message=f'Rendering cinematic 1080p artwork for "{title}" ({theme_to_use})...'
+            message=f'Generating custom AI artwork for "{title}" ({theme_to_use})...'
         )
 
         base_name = os.path.splitext(os.path.basename(audio_path))[0]
         backdrop_path = os.path.join(OUTPUT_DIR, f'{base_name}_backdrop.jpg')
         video_path = os.path.join(OUTPUT_DIR, f'{base_name}_1080p.mp4')
+        sermon_summary = ai_details.get('one_sentence_summary', '') if ai_details else ''
 
-        render_sermon_backdrop(
+        generate_sermon_artwork(
             title=title,
             preacher=preacher,
-            date_str=display_date,
-            out_image_path=backdrop_path,
+            display_date=display_date,
             scripture=scripture,
             visual_theme=theme_to_use,
-            custom_bg_path=custom_bg_path,
-            subtitle=subtitle
+            subtitle=subtitle,
+            out_path=backdrop_path,
+            custom_image_path=custom_bg_path,
+            sermon_summary=sermon_summary
         )
         
         update_job(job_id, message='Encoding 1080p video with FFmpeg...')
@@ -484,8 +487,9 @@ if __name__ == '__main__':
         print('=' * 65)
         print('  VCF SERMON PUBLISHING PORTAL (HUGGING FACE CLOUD)')
         print(f'  Starting Gradio cloud app on 0.0.0.0:{port}')
-        print('=' * 65)
-        demo.launch(server_name='0.0.0.0', server_port=port)
+        demo.launch(server_name='0.0.0.0', server_port=port, ssr_mode=False)
+        while True:
+            time.sleep(3600)
     else:
         from waitress import serve
         print('=' * 65)

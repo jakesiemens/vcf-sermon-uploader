@@ -2,7 +2,7 @@
 title: VCF Sermon Publisher
 emoji: 🎙️
 colorFrom: blue
-colorTo: orange
+colorTo: yellow
 sdk: gradio
 app_file: app.py
 pinned: false

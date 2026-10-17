@@ -11,6 +11,7 @@ from config import (
     GEMINI_API_KEY, OFFICIAL_PLAYLIST_ID
 )
 from pipeline.audio_analyzer import analyze_sermon_audio_multimodal
+from pipeline.image_generator import generate_sermon_artwork
 from pipeline.video_maker import render_sermon_backdrop, build_video_from_audio
 from pipeline.youtube_uploader import upload_sermon_to_youtube, get_youtube_service
 from pipeline.site_sync import sync_new_sermon_to_website
@@ -105,19 +106,21 @@ def publish_sermon(audio_file, preacher, preached_date_str, custom_title, custom
     theme_to_use = custom_theme if (custom_theme and custom_theme != "AUTO") else ai_theme
     subtitle = ai_details.get("subtitle", "") if ai_details else ""
 
-    progress(0.50, desc=f"Rendering 3D golden typography backdrop ({theme_to_use})...")
+    progress(0.50, desc=f"Generating custom AI artwork for '{title}'...")
     base_name = os.path.splitext(os.path.basename(audio_path))[0]
     backdrop_path = os.path.join(OUTPUT_DIR, f"{base_name}_backdrop.jpg")
     video_path = os.path.join(OUTPUT_DIR, f"{base_name}_1080p.mp4")
+    sermon_summary = ai_details.get("one_sentence_summary", "") if ai_details else ""
 
-    render_sermon_backdrop(
+    generate_sermon_artwork(
         title=title,
         preacher=preacher,
-        date_str=display_date,
-        out_image_path=backdrop_path,
+        display_date=display_date,
         scripture=scripture,
         visual_theme=theme_to_use,
-        subtitle=subtitle
+        subtitle=subtitle,
+        out_path=backdrop_path,
+        sermon_summary=sermon_summary
     )
 
     progress(0.65, desc="Encoding 1080p video with FFmpeg...")
@@ -252,4 +255,4 @@ with gr.Blocks(title="VCF Sermon Publisher") as demo:
     )
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860, theme=custom_theme)
+    demo.launch(server_name="0.0.0.0", server_port=7860, theme=custom_theme, ssr_mode=False)
