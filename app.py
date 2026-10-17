@@ -472,11 +472,25 @@ def get_job_status(job_id):
         return jsonify({'status': 'not_found', 'error': 'Unknown job ID'}), 404
     return jsonify(job), 200
 
+try:
+    from gradio_app import demo
+except Exception as e:
+    print(f"Notice: Gradio import: {e}")
+    demo = None
+
 if __name__ == '__main__':
-    from waitress import serve
     port = int(os.environ.get('PORT', 7860))
-    print('=' * 65)
-    print('  VCF SERMON PUBLISHING PORTAL (HARDENED ASYNC ENGINE)')
-    print(f'  Starting cloud server on 0.0.0.0:{port}')
-    print('=' * 65)
-    serve(app, host='0.0.0.0', port=port, threads=6)
+    if (os.environ.get('SPACE_ID') or os.environ.get('GRADIO_MODE')) and demo:
+        print('=' * 65)
+        print('  VCF SERMON PUBLISHING PORTAL (HUGGING FACE CLOUD)')
+        print(f'  Starting Gradio cloud app on 0.0.0.0:{port}')
+        print('=' * 65)
+        demo.launch(server_name='0.0.0.0', server_port=port)
+    else:
+        from waitress import serve
+        print('=' * 65)
+        print('  VCF SERMON PUBLISHING PORTAL (LOCAL / WAITRESS ENGINE)')
+        print(f'  Starting server on 0.0.0.0:{port}')
+        print('=' * 65)
+        serve(app, host='0.0.0.0', port=port, threads=6)
+
