@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 from google.oauth2.credentials import Credentials
@@ -6,6 +7,46 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 import requests
 from config import TOKEN_PATH, CLIENT_SECRET_PATH, GEMINI_API_KEY, OFFICIAL_PLAYLIST_ID
+
+def _sanitize_yt_text(text):
+    """Removes characters forbidden by YouTube Data API v3 (< and >) and control chars"""
+    if not text:
+        return ""
+    s = str(text).replace("<", "").replace(">", "")
+    s = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", s)
+    return s.strip()
+
+def _build_safe_youtube_title(title, preacher="", scripture=""):
+    """
+    Constructs a clean YouTube video title that preserves the user's custom sermon title
+    and strictly complies with YouTube's 100-byte UTF-8 limit without ugly mid-word truncation.
+    """
+    t = _sanitize_yt_text(title) or "Sermon Message"
+    p = _sanitize_yt_text(preacher)
+    s = _sanitize_yt_text(scripture)
+
+    # Candidate 1: Title (Preacher, Scripture)
+    if p and s:
+        cand1 = f"{t} ({p}, {s})"
+        if len(cand1.encode("utf-8")) <= 98:
+            return cand1
+
+    # Candidate 2: Title (Preacher) — used when scripture list is long or title is long
+    if p:
+        cand2 = f"{t} ({p})"
+        if len(cand2.encode("utf-8")) <= 98:
+            return cand2
+        cand2_dash = f"{t} - {p}"
+        if len(cand2_dash.encode("utf-8")) <= 98:
+            return cand2_dash
+
+    # Candidate 3: Just the Title
+    if len(t.encode("utf-8")) <= 98:
+        return t
+
+    # Safe UTF-8 byte truncation if title itself is > 98 bytes
+    encoded = t.encode("utf-8")[:95]
+    return encoded.decode("utf-8", errors="ignore").rstrip() + "..."
 
 def get_youtube_service():
     """Initializes authenticated YouTube API client from env var or file"""
@@ -49,7 +90,7 @@ def get_youtube_service():
     except Exception as e:
         err_msg = str(e)
         if "invalid_grant" in err_msg or "expired" in err_msg.lower():
-            raise RuntimeError("YouTube token has expired (Google 7-day limit in Testing mode). Please run reauth.bat or reauth_youtube.py to re-authenticate.")
+            raise RuntimeError("YouTube token has expired. Please run reauth.bat or reauth_youtube.py to re-authenticate.")
         raise
 
 def generate_rich_sermon_description(title, preacher, scripture, display_date, transcript="", ai_details=None):
@@ -59,58 +100,80 @@ def generate_rich_sermon_description(title, preacher, scripture, display_date, t
     
     sections = []
 
-    # 1. Overview
+    # 1. Overview (No hardcoded 'Sunday message' or location assumptions)
     summary = ""
     key_themes = []
     practical_takeaway = ""
     timestamps = []
 
     if isinstance(ai_details, dict):
-        summary = ai_details.get("one_sentence_summary", "")
+        summary = ai_details.get("one_sentence_summary", "") or ai_details.get("summary", "")
         key_themes = ai_details.get("key_themes", [])
         practical_takeaway = ai_details.get("practical_takeaway", "")
         timestamps = ai_details.get("timestamps", [])
 
+    # Clean any accidental boilerplate from AI summary
     if summary:
-        sections.append(f"{preacher} delivers a Sunday message titled '{title}' from {scripture if scripture else 'Scripture'} at Victory Christian Fellowship in Williamsburg, New Brunswick.\n\n{summary}")
+        summary = re.sub(r"(?i)\bat Victory Christian Fellowship in Williamsburg,?\s*New Brunswick\.?", "", summary).strip()
+        summary = re.sub(r"(?i)\bdelivers a Sunday (?:morning )?message\b", "shares a message", summary).strip()
+
+    if preacher and scripture:
+        intro_line = f"{preacher} shares a message titled '{title}' from {scripture}."
+    elif preacher:
+        intro_line = f"{preacher} shares a message titled '{title}'."
+    elif scripture:
+        intro_line = f"'{title}' — a message from {scripture}."
     else:
-        sections.append(f"{preacher} examines biblical teachings in {scripture if scripture else title}—exploring the theological meaning, spiritual significance, and modern application for believers today.")
+        intro_line = f"'{title}'"
+
+    if summary:
+        sections.append(f"{intro_line}\n\n{summary}")
+    else:
+        sections.append(intro_line)
 
     # 2. Key Themes
-    if key_themes:
+    if key_themes and isinstance(key_themes, list):
         theme_lines = ["Key Themes in This Message\n"]
         for t in key_themes:
-            t_name = t.get("theme", "")
-            t_exp = t.get("explanation", "")
-            theme_lines.append(f"• {t_name}: {t_exp}")
-        sections.append("\n".join(theme_lines))
+            if isinstance(t, dict):
+                t_name = t.get("theme", "")
+                t_exp = t.get("explanation", "")
+                if t_name and t_exp:
+                    theme_lines.append(f"• {t_name}: {t_exp}")
+                elif t_name:
+                    theme_lines.append(f"• {t_name}")
+        if len(theme_lines) > 1:
+            sections.append("\n".join(theme_lines))
 
     # 3. Practical Takeaway
     if practical_takeaway:
         sections.append(f"Practical Takeaway\n{practical_takeaway}")
 
     # 4. Video Chapters & Timestamps (YouTube Native Chapters)
-    if timestamps and len(timestamps) > 0:
+    if timestamps and isinstance(timestamps, list) and len(timestamps) > 0:
         ts_lines = ["Video Chapters & Timestamps:"]
         for ts in timestamps:
-            time_str = ts.get("time", "")
-            ts_title = ts.get("title", "")
-            # Ensure time format has at least m:ss
-            ts_lines.append(f"{time_str} - {ts_title}")
-        sections.append("\n".join(ts_lines))
+            if isinstance(ts, dict):
+                time_str = str(ts.get("time", "")).strip()
+                ts_title = str(ts.get("title", "")).strip()
+                if time_str and ts_title:
+                    ts_lines.append(f"{time_str} - {ts_title}")
+        if len(ts_lines) > 1:
+            sections.append("\n".join(ts_lines))
 
     # 5. Connect With Us & Reference Info
     connect_lines = [
         "Connect With Us",
-        f"Church Website: {website_link}",
-        f"Subscribe for Weekly Sermons: {subscribe_link}",
+        f"Website: {website_link}",
+        f"Subscribe for Sermons: {subscribe_link}",
         "",
+        f"Speaker: {preacher if preacher else 'Victory Christian Fellowship'}",
         f"Scripture Reference: {scripture if scripture else 'Biblical Teaching'}",
         f"Date Preached: {display_date}"
     ]
     sections.append("\n".join(connect_lines))
 
-    return "\n\n".join(sections)
+    return _sanitize_yt_text("\n\n".join(sections))[:4900]
 
 def add_video_to_official_playlist(video_id):
     """Adds newly published sermon to top (position 0) of the official playlist"""
@@ -137,32 +200,40 @@ def upload_sermon_to_youtube(video_path, thumbnail_path, title, preacher, displa
     """Uploads MP4 video and custom thumbnail to YouTube channel"""
     youtube = get_youtube_service()
 
-    # Clean YouTube Title
-    if preacher and scripture:
-        yt_title = f"{title} ({preacher}, {scripture})"
-    elif preacher:
-        yt_title = f"{title} - {preacher}"
-    else:
-        yt_title = title
+    # Build clean, safe YouTube Title (< 100 UTF-8 bytes, no forbidden characters)
+    yt_title = _build_safe_youtube_title(title, preacher, scripture)
 
     # Generate Rich Structured Description with Chapters & Timestamps
     yt_description = generate_rich_sermon_description(title, preacher, scripture, display_date, transcript, ai_details=ai_details)
 
-    tags = ["Victory Christian Fellowship", "VCF Sermons", "Williamsburg NB", "New Brunswick", "Sermon"]
+    raw_tags = ["Victory Christian Fellowship", "VCF Sermons", "Christian Sermon", "Bible Teaching"]
     if preacher:
-        tags.append(preacher)
+        clean_p = _sanitize_yt_text(preacher)
+        if clean_p and len(clean_p) <= 50:
+            raw_tags.append(clean_p)
     if scripture:
-        tags.append(scripture)
+        # Split multi-passage scriptures on ';' so individual tags stay short and valid
+        for part in re.split(r"[;,]", str(scripture)):
+            clean_s = _sanitize_yt_text(part)
+            if clean_s and len(clean_s) <= 50:
+                raw_tags.append(clean_s)
+
+    tags = []
+    total_tag_len = 0
+    for tag in raw_tags:
+        if tag and tag not in tags and (total_tag_len + len(tag)) < 350:
+            tags.append(tag)
+            total_tag_len += len(tag)
 
     body = {
         "snippet": {
-            "title": yt_title[:100],
+            "title": yt_title,
             "description": yt_description,
             "tags": tags,
             "categoryId": "29"
         },
         "status": {
-            "privacyStatus": privacy_status,
+            "privacyStatus": privacy_status if privacy_status in ("public", "unlisted", "private") else "public",
             "selfDeclaredMadeForKids": False
         }
     }
@@ -208,8 +279,10 @@ def upload_sermon_to_youtube(video_path, thumbnail_path, title, preacher, displa
     # Add to Official Chronological Playlist at position 0 (top)
     add_video_to_official_playlist(video_id)
 
+    yt_url = f"https://youtu.be/{video_id}"
     return {
         "video_id": video_id,
-        "url": f"https://youtu.be/{video_id}",
+        "url": yt_url,
+        "youtube_url": yt_url,
         "title": yt_title
     }

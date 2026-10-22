@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 
 from config import (
     DEFAULT_PORT, UPLOADS_DIR, OUTPUT_DIR, PREACHERS,
+    get_preachers, add_regular_preacher,
     TOKEN_PATH, CLIENT_SECRET_PATH, GEMINI_API_KEY
 )
 from pipeline.audio_analyzer import (
@@ -80,7 +81,27 @@ def index():
     today = datetime.now()
     days_since_sunday = (today.weekday() + 1) % 7
     default_date = (today if days_since_sunday == 0 else today).strftime('%Y-%m-%d')
-    return render_template('index.html', preachers=PREACHERS, default_date=default_date)
+    return render_template('index.html', preachers=get_preachers(), default_date=default_date)
+
+@app.route('/api/preachers', methods=['GET', 'POST'])
+def manage_preachers():
+    """Returns or adds a permanent regular preacher to the dropdown list"""
+    if request.method == 'GET':
+        return jsonify({'success': True, 'preachers': get_preachers()}), 200
+
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or request.form.get('name') or '').strip()
+    if not name:
+        return jsonify({'success': False, 'error': 'Please enter a preacher name.'}), 400
+    if len(name) > 80:
+        return jsonify({'success': False, 'error': 'Preacher name is too long.'}), 400
+
+    updated = add_regular_preacher(name)
+    return jsonify({
+        'success': True,
+        'preacher': " ".join(name.split()),
+        'preachers': updated
+    }), 200
 
 @app.route('/health')
 @app.route('/healthz')
@@ -100,7 +121,7 @@ def debug_info():
         try:
             with open(log_p, "r") as f:
                 ffmpeg_log = f.read()[-1000:]
-        except:
+        except Exception:
             pass
     with JOBS_LOCK:
         jobs_copy = dict(JOBS)
@@ -113,7 +134,7 @@ def clean_and_polish_title(raw_title):
     """Cleans up volunteer typos, casing, file extensions, and punctuation"""
     if not raw_title:
         return ""
-    t = raw_title.strip()
+    t = str(raw_title).strip()
     for ext in ['.mp3', '.m4a', '.wav', '.aac', '.flac', '.ogg', '.wma']:
         if t.lower().endswith(ext):
             t = t[:-len(ext)].strip()
@@ -152,18 +173,32 @@ def clean_and_polish_title(raw_title):
         
     return t
 
-def clean_and_polish_scripture(raw_scripture):
-    """Standardizes volunteer scripture formatting (e.g. rom 8 1 11 -> Romans 8:1-11)"""
-    if not raw_scripture:
+def _polish_single_scripture(segment):
+    """Polishes a single scripture reference (e.g. 'rom 8 1 11' -> 'Romans 8:1-11' or '1 john 1:3' -> '1 John 1:3')"""
+    s = ' '.join(segment.strip().split())
+    if not s:
         return ""
-    s = raw_scripture.strip()
-    s = s.replace(';', ':').replace(',', ':')
-    s = ' '.join(s.split())
-    m = re.match(r'^([0-9]?\s*[A-Za-z]+)\s+([0-9]{1,3})\s+([0-9]{1,3}(?:\s*[-–]\s*[0-9]{1,3})?)$', s)
+    # Shorthand without colon: 'Romans 8 1-11' or '1 John 1 3'
+    m = re.match(r'^([1-3]?\s*[A-Za-z]+)\s+([0-9]{1,3})\s+([0-9]{1,3}(?:\s*[-–]\s*[0-9]{1,3})?)$', s)
     if m:
         book, chap, v = m.groups()
-        return f"{book.title()} {chap}:{v.replace(' ', '')}"
-    return s.title()
+        return f"{book.strip().title()} {chap}:{v.replace(' ', '')}"
+    # Standard reference with colon: '1 john 1:3'
+    m2 = re.match(r'^([1-3]?\s*[A-Za-z\s]+?)\s+([0-9]{1,3})\s*:\s*([0-9]{1,3}(?:\s*[-–,]\s*[0-9]{1,3})*)$', s)
+    if m2:
+        book, chap, v = m2.groups()
+        return f"{book.strip().title()} {chap}:{re.sub(r'\\s+', '', v)}"
+    return s[0].upper() + s[1:] if len(s) > 1 else s.upper()
+
+def clean_and_polish_scripture(raw_scripture):
+    """Standardizes scripture formatting while preserving multi-passage semicolons (e.g. 'Genesis 2:18; John 15:15')"""
+    if not raw_scripture:
+        return ""
+    s = str(raw_scripture).strip()
+    if ';' in s:
+        parts = [_polish_single_scripture(p) for p in s.split(';')]
+        return '; '.join([p for p in parts if p])
+    return _polish_single_scripture(s)
 
 def process_sermon_worker(job_id, audio_path, filename, custom_title, custom_scripture, preacher, preached_date_iso, privacy, custom_theme=None, custom_bg_path=None):
     try:
@@ -187,8 +222,13 @@ def process_sermon_worker(job_id, audio_path, filename, custom_title, custom_scr
         transcript = ''
         ai_details = None
 
-        print(f'[{job_id}] Running multimodal sermon analysis with Gemini...')
-        ai_details = analyze_sermon_audio_multimodal(audio_path, preacher=preacher)
+        print(f'[{job_id}] Running full-sermon multimodal analysis with Gemini (custom_title="{title}", custom_scripture="{scripture}")...')
+        ai_details = analyze_sermon_audio_multimodal(
+            audio_path,
+            preacher=preacher,
+            custom_title=title,
+            custom_scripture=scripture
+        )
 
         if ai_details:
             if not title and ai_details.get('title'):
@@ -200,9 +240,9 @@ def process_sermon_worker(job_id, audio_path, filename, custom_title, custom_scr
             if scripture:
                 title = f'Message from {scripture}'
             elif display_date:
-                title = f'Sunday Message - {display_date}'
+                title = f'Message - {display_date}'
             else:
-                title = 'Sunday Morning Message'
+                title = 'Biblical Message'
 
         print(f'[{job_id}] Final Title: "{title}" | Scripture: "{scripture}" | Preacher: "{preacher}"')
 
@@ -210,13 +250,14 @@ def process_sermon_worker(job_id, audio_path, filename, custom_title, custom_scr
         ai_theme = ai_details.get('visual_theme', 'WORD_TEACHING') if ai_details else 'WORD_TEACHING'
         theme_to_use = custom_theme if (custom_theme and custom_theme != 'AUTO') else ai_theme
         subtitle = ai_details.get('subtitle', '') if ai_details else ''
+        ai_image_prompt = ai_details.get('image_prompt', '') if (ai_details and (not custom_theme or custom_theme == 'AUTO')) else ''
 
-        # Step 3: Video Generation (Fast 1fps)
+        # Step 3: High-Res AI Artwork & Video Generation
         update_job(job_id,
             step=3,
             step_name='video',
             progress=55,
-            message=f'Generating custom AI artwork for "{title}" ({theme_to_use})...'
+            message=f'Generating high-resolution 1080p AI thumbnail for "{title}"...'
         )
 
         base_name = os.path.splitext(os.path.basename(audio_path))[0]
@@ -233,7 +274,8 @@ def process_sermon_worker(job_id, audio_path, filename, custom_title, custom_scr
             subtitle=subtitle,
             out_path=backdrop_path,
             custom_image_path=custom_bg_path,
-            sermon_summary=sermon_summary
+            sermon_summary=sermon_summary,
+            ai_image_prompt=ai_image_prompt
         )
         
         update_job(job_id, message='Encoding 1080p video with FFmpeg...')
@@ -356,9 +398,13 @@ def start_publish_job():
     custom_title = request.form.get('title', '').strip()
     custom_scripture = request.form.get('scripture', '').strip()
     preacher = request.form.get('preacher', 'Victory Christian Fellowship').strip()
+    save_preacher_flag = request.form.get('save_preacher', '').strip().lower() in ('true', '1', 'yes', 'on')
     preached_date_iso = request.form.get('preached_date', datetime.now().strftime('%Y-%m-%d')).strip()
     privacy = request.form.get('privacy', 'public').strip()
     custom_theme = request.form.get('theme', 'AUTO').strip()
+
+    if save_preacher_flag and preacher and preacher not in ('Guest Speaker', 'Open Sharing', '__ADD_REGULAR__'):
+        add_regular_preacher(preacher)
 
     # Preached date validation
     try:
@@ -379,17 +425,16 @@ def start_publish_job():
                 custom_bg_path = os.path.join(UPLOADS_DIR, art_name)
                 art_file.save(custom_bg_path)
 
-    # Idempotency key handling to prevent duplicate jobs on network retry/double-submit
+    # Idempotency key handling (includes custom_title and custom_scripture so custom title overrides never collide)
     idempotency_key = request.form.get('idempotency_key', '').strip()
     if not idempotency_key:
-        idempotency_key = f"{filename}_{file_size}_{preached_date_iso}_{preacher}_{custom_theme}"
+        idempotency_key = f"{filename}_{file_size}_{preached_date_iso}_{preacher}_{custom_theme}_{custom_title}_{custom_scripture}"
 
     with JOBS_LOCK:
         for existing_id, job in JOBS.items():
             if job.get('idempotency_key') == idempotency_key:
                 status = job.get('status')
                 created_at = job.get('created_at', 0)
-                # If currently processing or completed in the last 4 hours
                 if status == 'processing' or (status == 'completed' and (time.time() - created_at < 14400)):
                     print(f"[{existing_id}] Matched idempotency key '{idempotency_key}'. Returning existing job.")
                     return jsonify({
@@ -411,7 +456,7 @@ def start_publish_job():
         if os.path.exists(temp_upload_path):
             try:
                 os.remove(temp_upload_path)
-            except:
+            except Exception:
                 pass
         return jsonify({'success': False, 'error': f'Failed to store uploaded file: {str(e)}'}), 500
 
@@ -497,4 +542,3 @@ if __name__ == '__main__':
         print(f'  Starting server on 0.0.0.0:{port}')
         print('=' * 65)
         serve(app, host='0.0.0.0', port=port, threads=6)
-

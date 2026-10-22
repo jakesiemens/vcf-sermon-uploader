@@ -44,6 +44,16 @@ label{font-size:.88rem;font-weight:600;color:var(--primary)}
 input[type=text],input[type=date],select{padding:12px 14px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:.95rem;background:#fff;color:var(--text);min-width:0}
 input:disabled,select:disabled,button:disabled{opacity:.65;cursor:not-allowed}
 input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid rgba(234,100,42,.4);outline-offset:1px;border-color:var(--orange)}
+.custom-preacher-box{display:flex;flex-direction:column;gap:8px;margin-top:6px;background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+.custom-preacher-box[hidden]{display:none}
+.custom-preacher-row{display:flex;gap:8px;align-items:center}
+.custom-preacher-row input{flex:1}
+.btn-save-preacher{background:var(--primary);color:#fff;border:0;border-radius:7px;padding:10px 14px;font-size:.84rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s}
+.btn-save-preacher:hover:not(:disabled){background:#2c475f}
+.save-preacher-opt{display:flex;align-items:center;gap:7px;font-size:.82rem;color:var(--text);font-weight:500;cursor:pointer}
+.save-preacher-opt input{width:16px;height:16px;accent-color:var(--orange);cursor:pointer}
+.preacher-saved-msg{font-size:.8rem;color:#047857;font-weight:600}
+.preacher-saved-msg[hidden]{display:none}
 .submit{background:var(--orange);color:#fff;border:0;border-radius:8px;padding:18px 24px;font-size:1.15rem;font-weight:700;cursor:pointer;width:100%;margin-top:24px;box-shadow:0 4px 12px rgba(234,100,42,.25);transition:background .2s,transform .2s}
 .submit:hover:not(:disabled){background:var(--orange-hover);transform:translateY(-1px)}
 .submit:disabled{background:#94A3B8;box-shadow:none}
@@ -88,8 +98,8 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
 
 <main class="container">
   <div class="card">
-    <h2>Upload Sunday Sermon</h2>
-    <p>Select the sermon audio below. AI will transcribe it, determine the title and scripture when needed, render the 1080p video, and publish it.</p>
+    <h2>Upload Sermon</h2>
+    <p>Select the sermon audio below. AI will analyze the full message, generate a custom 1080p thumbnail, render the video, and publish it.</p>
 
     <form id="form" novalidate>
       <label class="dropzone" id="dropzone" for="audio">
@@ -113,7 +123,10 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
           <select id="preacher" name="preacher">
             {% if preachers %}
               {% for p in preachers %}
-              <option value="{{ p }}">{{ p }}</option>
+                {% if p == 'Guest Speaker' %}
+                <option value="__ADD_REGULAR__">➕ Add New Regular Preacher...</option>
+                {% endif %}
+                <option value="{{ p }}">{{ p }}</option>
               {% endfor %}
             {% else %}
               <option>Jake Siemens</option><option>Corny Janzen</option><option>Jake Driedger</option>
@@ -121,11 +134,24 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
               <option>John Enns</option><option>Bernie Bergen</option><option>Aaron Knelsen</option>
               <option>Seth Janzen</option><option>David Hiebert</option><option>Joe Brubacher</option>
               <option>Johan Fehr</option><option>Matthew Janzen</option><option>Peter Driedger</option>
-              <option>Henry Klassen</option><option>Mark Villeneuve</option><option>Open Sharing</option>
+              <option>Henry Klassen</option><option>Mark Villeneuve</option><option>Ross Ulrich</option>
+              <option>Raymond Burkholder</option><option>Open Sharing</option>
+              <option value="__ADD_REGULAR__">➕ Add New Regular Preacher...</option>
               <option>Guest Speaker</option>
             {% endif %}
           </select>
-          <input type="text" id="custom-preacher" maxlength="100" autocomplete="name" placeholder="Enter guest preacher name" aria-label="Guest preacher name" hidden>
+
+          <div class="custom-preacher-box" id="custom-preacher-box" hidden>
+            <div class="custom-preacher-row">
+              <input type="text" id="custom-preacher" maxlength="80" autocomplete="name" placeholder="Enter preacher's full name" aria-label="Preacher name">
+              <button type="button" class="btn-save-preacher" id="save-preacher-btn">Save to List</button>
+            </div>
+            <label class="save-preacher-opt">
+              <input type="checkbox" id="save-preacher-chk">
+              <span>Save as a regular preacher in the dropdown list</span>
+            </label>
+          </div>
+          <div class="preacher-saved-msg" id="preacher-saved-msg" hidden></div>
         </div>
 
         <div class="group">
@@ -134,28 +160,28 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
         </div>
 
         <div class="group full">
-          <label for="title">Sermon Title <span class="badge ai">Optional - AI detects</span></label>
-          <input type="text" id="title" name="title" maxlength="100" autocomplete="off" placeholder="Leave blank to let AI generate the title">
-          <span class="helper">If the preacher gave you a title, enter it here.</span>
+          <label for="title">Sermon Title <span class="badge ai">Optional - AI detects if left blank</span></label>
+          <input type="text" id="title" name="title" maxlength="160" autocomplete="off" placeholder="Enter exact sermon title (or leave blank to let AI detect)">
+          <span class="helper">If you enter a title here, your exact title will be used on the thumbnail and YouTube.</span>
         </div>
 
         <div class="group full">
-          <label for="scripture">Scripture Passage <span class="badge ai">Optional - AI detects</span></label>
-          <input type="text" id="scripture" name="scripture" maxlength="100" autocomplete="off" placeholder="e.g. Romans 8:1-11">
+          <label for="scripture">Scripture Passage <span class="badge ai">Optional - AI detects if left blank</span></label>
+          <input type="text" id="scripture" name="scripture" maxlength="160" autocomplete="off" placeholder="e.g. Romans 8:1-11 or Genesis 2:18; John 15:15">
           <span class="helper">AI listens for scripture references if left blank.</span>
         </div>
 
         <div class="group">
-          <label for="theme">Thumbnail & Video Artwork <span class="badge ai">AI matched</span></label>
+          <label for="theme">Thumbnail &amp; Video Artwork <span class="badge ai">High-Res AI</span></label>
           <select id="theme" name="theme">
-            <option value="AUTO" selected>✨ Automatic (AI matches sermon topic)</option>
-            <option value="WORD_TEACHING">📖 The Word & Scripture (Open Bible in Sunlight)</option>
-            <option value="CROSS_GRACE">✝️ The Cross & Grace (Sunrise on Calvary)</option>
-            <option value="PEACE_SHEPHERD">🐑 The Shepherd & Peace (Psalm 23 Pastures & Still Waters)</option>
-            <option value="FAITH_MOUNTAIN">⛰️ Faith & Strength (Majestic Mountain Dawn)</option>
-            <option value="STORM_DELIVERANCE">🌊 Peace in the Storm (Sea of Galilee)</option>
-            <option value="HOLY_SPIRIT">🕊️ Holy Spirit & Prayer (Sanctuary Divine Light)</option>
-            <option value="LOCAL_FELLOWSHIP">🌲 Local Fellowship (Williamsburg NB Sunset)</option>
+            <option value="AUTO" selected>✨ Automatic (AI generates scene matching message)</option>
+            <option value="WORD_TEACHING">📖 The Word &amp; Scripture (Open Bible in Sunlight)</option>
+            <option value="CROSS_GRACE">✝️ The Cross &amp; Grace (Sunrise on Calvary)</option>
+            <option value="PEACE_SHEPHERD">🐑 The Shepherd &amp; Peace (Psalm 23 Pastures &amp; Still Waters)</option>
+            <option value="FAITH_MOUNTAIN">⛰️ Faith &amp; Strength (Majestic Mountain Dawn)</option>
+            <option value="STORM_DELIVERANCE">🌊 Peace in the Storm (Sunlight over Waves)</option>
+            <option value="HOLY_SPIRIT">🌅 Creation &amp; Morning Light (Sunbeams over Forest Valley)</option>
+            <option value="LOCAL_FELLOWSHIP">🌲 Autumn River Valley (Golden Sunrise Landscape)</option>
             <option value="CLASSIC_SLATE">🏛️ Classic Slate Navy</option>
           </select>
         </div>
@@ -180,8 +206,8 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
     <div class="bar" role="progressbar" aria-label="Publishing progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="bar-wrap"><div id="bar"></div></div>
     <ul class="steps" id="steps">
       <li class="step"><i>1</i><span id="upload-text">Uploading audio file</span></li>
-      <li class="step"><i>2</i><span>AI analyzing audio, extracting title &amp; scripture</span></li>
-      <li class="step"><i>3</i><span>Rendering 1080p video</span></li>
+      <li class="step"><i>2</i><span>AI analyzing full sermon audio, chapters &amp; scripture</span></li>
+      <li class="step"><i>3</i><span>Generating 1080p AI thumbnail &amp; rendering video</span></li>
       <li class="step"><i>4</i><span>Uploading video &amp; thumbnail to YouTube</span></li>
       <li class="step"><i>5</i><span>Publishing to victorychristianfellowship.ca</span></li>
     </ul>
@@ -204,9 +230,9 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
 (() => {
   'use strict';
 
-  // Keep these values aligned with the server configuration.
   const CONFIG = Object.freeze({
     publishUrl: '/api/publish',
+    preachersUrl: '/api/preachers',
     statusUrl: jobId => '/api/status/' + encodeURIComponent(jobId),
     maxFileMB: 500,
     pollMs: 1500,
@@ -219,7 +245,10 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
   const $ = id => document.getElementById(id);
   const el = {
     form: $('form'), audio: $('audio'), drop: $('dropzone'), box: $('file-box'), alert: $('alert'),
-    preacher: $('preacher'), custom: $('custom-preacher'), date: $('date'), submit: $('submit'),
+    preacher: $('preacher'), customBox: $('custom-preacher-box'), custom: $('custom-preacher'),
+    savePreacherBtn: $('save-preacher-btn'), savePreacherChk: $('save-preacher-chk'),
+    preacherSavedMsg: $('preacher-saved-msg'),
+    date: $('date'), submit: $('submit'),
     progress: $('progress'), bar: $('bar'), barWrap: $('bar-wrap'), success: $('success'),
     progressTitle: $('progress-title'), statusNote: $('status-note'), uploadText: $('upload-text'),
     ytLink: $('yt-link'), siteLink: $('site-link'), again: $('again'), clear: $('clear'),
@@ -262,6 +291,65 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
     return (bytes / 1048576).toFixed(1);
   }
 
+  function isCustomPreacherMode() {
+    return el.preacher.value === 'Guest Speaker' || el.preacher.value === '__ADD_REGULAR__';
+  }
+
+  function populatePreacherDropdown(preachersList, selectValue) {
+    if (!Array.isArray(preachersList) || !preachersList.length) return;
+    el.preacher.innerHTML = '';
+    for (const p of preachersList) {
+      if (p === 'Guest Speaker') {
+        const addOpt = document.createElement('option');
+        addOpt.value = '__ADD_REGULAR__';
+        addOpt.textContent = '➕ Add New Regular Preacher...';
+        el.preacher.appendChild(addOpt);
+      }
+      const opt = document.createElement('option');
+      opt.value = p;
+      opt.textContent = p;
+      el.preacher.appendChild(opt);
+    }
+    if (selectValue) {
+      el.preacher.value = selectValue;
+    }
+  }
+
+  async function saveNewRegularPreacher() {
+    const name = normalizeText(el.custom.value);
+    if (!name) {
+      el.custom.focus();
+      showError('Please enter the preacher\'s name first.');
+      return;
+    }
+    clearError();
+    el.savePreacherBtn.disabled = true;
+    const origText = el.savePreacherBtn.textContent;
+    el.savePreacherBtn.textContent = 'Saving...';
+    try {
+      const res = await fetch(CONFIG.preachersUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Could not save preacher.');
+      }
+      populatePreacherDropdown(data.preachers, data.preacher);
+      el.custom.value = '';
+      el.customBox.hidden = true;
+      el.preacherSavedMsg.textContent = `✅ Added "${data.preacher}" to regular preachers!`;
+      el.preacherSavedMsg.hidden = false;
+      setTimeout(() => { el.preacherSavedMsg.hidden = true; }, 5000);
+    } catch (err) {
+      showError(err.message || 'Could not save preacher.');
+    } finally {
+      el.savePreacherBtn.disabled = false;
+      el.savePreacherBtn.textContent = origText;
+    }
+  }
+
   function resetDateDefaults() {
     el.date.max = todayLocal();
     if (!el.date.value) {
@@ -298,7 +386,6 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
     el.barWrap.setAttribute('aria-valuenow', String(Math.round(next)));
   }
 
-  // current: 1-5 = current step; 6 = all five steps complete.
   function setStep(current) {
     const parsed = Number(current);
     const safeCurrent = Number.isFinite(parsed) ? Math.min(6, Math.max(1, Math.trunc(parsed))) : 1;
@@ -362,8 +449,6 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
     el.fileSize.textContent = `${fmtMB(file.size)} MB • Ready to process & publish`;
     el.box.classList.add('active');
 
-    // A dropped file is held directly in selectedFile. We intentionally do not
-    // assign input.files because that operation is unreliable in some browsers.
     if (!fromInput) el.audio.value = '';
     return true;
   }
@@ -408,21 +493,26 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
   }
 
   function createFormData(file) {
-    const preacher = el.preacher.value === 'Guest Speaker'
+    const preacher = isCustomPreacherMode()
       ? normalizeText(el.custom.value)
       : normalizeText(el.preacher.value);
+
+    const savePreacher = isCustomPreacherMode() && (el.preacher.value === '__ADD_REGULAR__' || el.savePreacherChk.checked);
+    const titleVal = normalizeText($('title').value);
+    const scriptureVal = normalizeText($('scripture').value);
 
     const fd = new FormData();
     fd.append('audio', file, file.name);
     fd.append('preacher', preacher);
+    fd.append('save_preacher', savePreacher ? 'true' : 'false');
     fd.append('preached_date', el.date.value);
-    fd.append('title', normalizeText($('title').value));
-    fd.append('scripture', normalizeText($('scripture').value));
+    fd.append('title', titleVal);
+    fd.append('scripture', scriptureVal);
     fd.append('privacy', $('privacy').value);
     fd.append('theme', $('theme').value);
 
-    // Client-side idempotency key to prevent accidental duplicate processing
-    const rawKey = `${file.name}_${file.size}_${file.lastModified || 0}_${el.date.value}_${preacher}_${$('theme').value}`;
+    // Client-side idempotency key includes custom title and scripture so custom overrides never collide
+    const rawKey = `${file.name}_${file.size}_${file.lastModified || 0}_${el.date.value}_${preacher}_${$('theme').value}_${titleVal}_${scriptureVal}`;
     fd.append('idempotency_key', rawKey);
     return fd;
   }
@@ -432,14 +522,13 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
     if (fileError) return fileError;
     if (!el.date.value) return 'Please pick the date this sermon was preached.';
     if (el.date.value > todayLocal()) return 'The preached date cannot be in the future.';
-    if (el.preacher.value === 'Guest Speaker' && !normalizeText(el.custom.value)) {
+    if (isCustomPreacherMode() && !normalizeText(el.custom.value)) {
       el.custom.focus();
-      return 'Please enter the guest preacher\'s name.';
+      return 'Please enter the preacher\'s name.';
     }
     return null;
   }
 
-  // XHR is used because it supports upload progress events.
   function upload(formData) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -623,7 +712,6 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
 
   el.clear.addEventListener('click', clearFile);
 
-  // Prevent the browser from opening a dropped file as a new page.
   for (const eventName of ['dragover', 'drop']) {
     window.addEventListener(eventName, event => event.preventDefault());
   }
@@ -653,10 +741,28 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
   });
 
   el.preacher.addEventListener('change', () => {
-    const guest = el.preacher.value === 'Guest Speaker';
-    el.custom.hidden = !guest;
-    if (!guest) el.custom.value = '';
-    if (guest) el.custom.focus();
+    const isCustom = isCustomPreacherMode();
+    el.customBox.hidden = !isCustom;
+    el.preacherSavedMsg.hidden = true;
+    if (el.preacher.value === '__ADD_REGULAR__') {
+      el.savePreacherChk.checked = true;
+      el.custom.placeholder = 'Enter new regular preacher\'s name';
+    } else if (el.preacher.value === 'Guest Speaker') {
+      el.savePreacherChk.checked = false;
+      el.custom.placeholder = 'Enter guest preacher\'s name';
+    } else {
+      el.custom.value = '';
+    }
+    if (isCustom) el.custom.focus();
+  });
+
+  el.savePreacherBtn.addEventListener('click', saveNewRegularPreacher);
+
+  el.custom.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && el.preacher.value === '__ADD_REGULAR__') {
+      event.preventDefault();
+      saveNewRegularPreacher();
+    }
   });
 
   el.form.addEventListener('submit', async event => {
@@ -671,6 +777,9 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
     }
 
     const formData = createFormData(selectedFile);
+    const shouldRefreshPreachers = isCustomPreacherMode() && (el.preacher.value === '__ADD_REGULAR__' || el.savePreacherChk.checked);
+    const customNameSaved = normalizeText(el.custom.value);
+
     setBusy(true);
     resetOutcome();
     resetProgress();
@@ -684,6 +793,18 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
       setStep(2);
       setBar(40);
       el.uploadText.textContent = 'Audio upload complete';
+      if (shouldRefreshPreachers && customNameSaved) {
+        try {
+          const r = await fetch(CONFIG.preachersUrl);
+          if (r.ok) {
+            const pData = await r.json();
+            if (pData && pData.preachers) {
+              populatePreacherDropdown(pData.preachers, customNameSaved);
+              el.customBox.hidden = true;
+            }
+          }
+        } catch {}
+      }
       showResult(await poll(jobId));
       clearFile();
     } catch (error) {
@@ -702,7 +823,7 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
     el.form.reset();
     clearFile();
     resetDateDefaults();
-    el.custom.hidden = true;
+    el.customBox.hidden = true;
     clearError();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
@@ -723,14 +844,12 @@ footer{text-align:center;padding:20px;color:var(--muted);font-size:.85rem}
       if (!res.ok) return;
       const data = await res.json();
       if (data && data.youtube_auth === false) {
-        showError('⚠️ YouTube authorization has expired (Google 7-day test limit). Please double-click "reauth.bat" in the app folder to refresh credentials.');
+        showError('⚠️ YouTube authorization has expired. Please double-click "reauth.bat" in the app folder to refresh credentials.');
       }
     } catch {}
   }
   checkHealth();
 
-  // Recover an already-created job after an accidental refresh. This cannot
-  // recover an upload interrupted before the server returned a job_id.
   const savedJob = loadActiveJob();
   if (savedJob) monitorJob(savedJob.jobId, savedJob.startedAt);
 })();
