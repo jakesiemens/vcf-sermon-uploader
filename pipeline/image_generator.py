@@ -76,7 +76,7 @@ Write a single vivid, concrete text-to-image prompt (35-50 words) for a breathta
   • NO human faces/people, NO text, NO typography, NO letters, NO words in the image.
 Return ONLY the raw prompt description, nothing else."""
 
-        for model in ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.7-flash", "gemini-3.6-flash"]:
+        for model in ["gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"]:
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
                 res = requests.post(url, json={"contents": [{"parts": [{"text": p_text}]}]}, timeout=12)
