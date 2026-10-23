@@ -259,7 +259,7 @@ Return ONLY valid JSON.
             }
         }
 
-        candidate_models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash"]
+        candidate_models = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.7-flash", "gemini-3.6-flash"]
         for model_name in candidate_models:
             try:
                 print(f"[AudioAnalyzer] Sending full {dur_mins}-min audio to {model_name} (timeout=180s)...", flush=True)

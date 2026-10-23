@@ -12,7 +12,7 @@ from pipeline.video_maker import render_sermon_backdrop, resolve_backdrop_image
 # Pure evangelical, non-denominational outdoor/nature/biblical prompts (Strictly NO church interiors, cathedrals, stained glass, or altars)
 THEME_PROMPTS = {
     "CROSS_GRACE": "majestic rough-hewn wooden cross standing on a tranquil grassy hill at golden hour sunrise, warm heavenly sunbeams breaking through glowing clouds over rolling hills, cinematic landscape photography, 8k, photorealistic masterpiece, no text",
-    "WORD_TEACHING": "open leather-bound Holy Bible resting on a rustic weathered oak table outdoors overlooking a peaceful sunlit mountain meadow at golden hour, warm natural morning light illuminating the pages, shallow depth of field, 8k, photorealistic masterpiece, no text",
+    "WORD_TEACHING": "a single open leather-bound Holy Bible resting flat on a rustic weathered oak table outdoors overlooking a peaceful sunlit mountain meadow at golden hour, warm natural morning light illuminating the pages, shallow depth of field, 8k, photorealistic masterpiece, single book only, no stacked books, no text",
     "FAITH_MOUNTAIN": "majestic rugged mountain peak rising above a sea of morning mist at golden sunrise, radiant sunbeams piercing through dramatic clouds over pine forests, awe-inspiring creation landscape, 8k, photorealistic masterpiece, no text",
     "PEACE_SHEPHERD": "lush green pastures beside still crystal-clear reflective waters in a sunlit valley at dawn, gentle rolling hills and olive trees in warm golden morning light, Psalm 23 scenery, 8k, photorealistic masterpiece, no text",
     "STORM_DELIVERANCE": "dramatic ocean waves calming as a brilliant golden beam of sunlight breaks through dark storm clouds onto a peaceful horizon, cinematic coastal landscape, 8k, photorealistic masterpiece, no text",
@@ -67,15 +67,16 @@ Write a single vivid, concrete text-to-image prompt (35-50 words) for a breathta
   • Marriage, friendship, family, or unity -> a peaceful sunlit country path through a blooming meadow or two Adirondack chairs by a calm golden-hour lake surrounded by autumn trees.
   • Home, foundation, or authority -> a warm, sturdy cedar homestead in a sunlit mountain valley or a solid rock lighthouse/foundation beside clear waters at sunrise.
   • Faith, endurance, or spiritual warfare -> majestic rugged mountain peaks above morning clouds at sunrise.
-  • The Word, truth, or doctrine -> an open leather-bound Bible on a rustic wooden table outdoors in warm golden morning sunlight.
+  • The Word, truth, or doctrine -> a single open leather-bound Bible lying flat on a rustic wooden table outdoors in warm golden morning sunlight (never stacked Bibles or multiple Bibles).
   • Grace, salvation, or the Gospel -> a simple wooden cross on a grassy hill at sunrise with golden rays breaking through clouds.
   • Peace, guidance, or comfort -> green pastures and still reflective waters at dawn.
 - STRICT NEGATIVE RULES:
   • We are an evangelical, non-denominational church. NEVER include any church buildings, inside-of-church interiors, cathedrals, stained glass, pews, altars, candles, or old-fashioned/cryptic religious architecture.
+  • NEVER show two Bibles or a Bible standing on top of another Bible.
   • NO human faces/people, NO text, NO typography, NO letters, NO words in the image.
 Return ONLY the raw prompt description, nothing else."""
 
-        for model in ["gemini-2.5-flash", "gemini-flash-latest", "gemini-3.6-flash", "gemini-3.7-flash"]:
+        for model in ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.7-flash", "gemini-3.6-flash"]:
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
                 res = requests.post(url, json={"contents": [{"parts": [{"text": p_text}]}]}, timeout=12)
